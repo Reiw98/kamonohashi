@@ -93,7 +93,7 @@ namespace Nssol.Platypus.Controllers.spa
         /// 新規にクラスタを登録する
         /// </summary>
         /// <param name="model">登録するクラスタ情報</param>
-        /// <param name="tenantRepository">DI</param>
+        /// <param name="tenantRepository">DI用</param>
         [HttpPost("/api/v1/admin/cluster")]
         [PermissionFilter(MenuCode.Cluster)]
         [ProducesResponseType(typeof(IndexOutputModel), (int)HttpStatusCode.Created)]
@@ -138,7 +138,7 @@ namespace Nssol.Platypus.Controllers.spa
         /// </summary>
         /// <param name="id">編集対象のクラスタID</param>
         /// <param name="model">編集するクラスタ情報</param>
-        /// <param name="tenantRepository">DI</param>
+        /// <param name="tenantRepository">DI用</param>
         [HttpPut("/api/v1/admin/cluster/{id}")]
         [PermissionFilter(MenuCode.Cluster)]
         [ProducesResponseType(typeof(IndexOutputModel), (int)HttpStatusCode.OK)]
@@ -240,6 +240,7 @@ namespace Nssol.Platypus.Controllers.spa
         /// <summary>
         /// 接続中のテナントに有効なパーティションの一覧を取得する。
         /// </summary>
+        /// <param name="nodeRepository">DI用</param>
         [HttpGet("tenant/partitions")]
         [PermissionFilter(MenuCode.Training, MenuCode.Preprocess, MenuCode.Inference, MenuCode.Notebook)]
         [ProducesResponseType(typeof(IEnumerable<string>), (int)HttpStatusCode.OK)]
@@ -254,6 +255,7 @@ namespace Nssol.Platypus.Controllers.spa
         /// <summary>
         /// パーティションの一覧を取得する。
         /// </summary>
+        /// <param name="nodeRepository">DI用</param>
         [HttpGet("admin/partitions")]
         [PermissionFilter(MenuCode.Node)]
         [ProducesResponseType(typeof(IEnumerable<string>), (int)HttpStatusCode.OK)]
@@ -272,6 +274,7 @@ namespace Nssol.Platypus.Controllers.spa
         /// <summary>
         /// クォータ設定を取得する。
         /// </summary>
+        /// <param name="tenantRepository">DI用</param>
         [HttpGet("admin/quotas")]
         [PermissionFilter(MenuCode.Quota)]
         [ProducesResponseType(typeof(IEnumerable<QuotaOutputModel>), (int)HttpStatusCode.OK)]
@@ -287,6 +290,8 @@ namespace Nssol.Platypus.Controllers.spa
         /// <remarks>
         /// 0が指定された場合、上限なしを示す。また、指定のなかったテナントは更新しない。
         /// </remarks>
+        /// <param name="models">クォータ更新用モデル</param>
+        /// <param name="tenantRepository">DI用</param>
         [HttpPost("admin/quotas")]
         [PermissionFilter(MenuCode.Quota)]
         [ProducesResponseType(typeof(IEnumerable<QuotaOutputModel>), (int)HttpStatusCode.OK)]

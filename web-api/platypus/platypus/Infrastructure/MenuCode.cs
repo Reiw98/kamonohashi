@@ -1,9 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Threading.Tasks;
-
-namespace Nssol.Platypus.Infrastructure
+﻿namespace Nssol.Platypus.Infrastructure
 {
     /// <summary>
     /// メニューコードの一覧
@@ -108,6 +103,10 @@ namespace Nssol.Platypus.Infrastructure
         /// ノード管理
         /// </summary>
         Node,
+        /// <summary>
+        /// クラスタ管理
+        /// </summary>
+        Cluster,
         /// <summary>
         /// メニュー管理
         /// </summary>

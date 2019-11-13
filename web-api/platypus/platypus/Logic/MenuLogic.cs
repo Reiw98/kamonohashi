@@ -48,6 +48,7 @@ namespace Nssol.Platypus.Logic
                 QuotaMenu,
                 UserMenu,
                 NodeMenu,
+                ClusterMenu,
                 MenuAccessMenu,
                 ResourceMenu
             };
@@ -502,9 +503,19 @@ namespace Nssol.Platypus.Logic
         internal static MenuItemInfo NodeMenu = new MenuItemInfo()
         {
             Name = "ノード管理",
-            Description = "クラスタノードの設定管理",
+            Description = "ノードの設定管理",
             Code = MenuCode.Node,
             Url = "/node",
+            ShowTopMenu = false,
+            ShowSideMenu = true,
+            MenuType = MenuType.System
+        };
+        internal static MenuItemInfo ClusterMenu = new MenuItemInfo()
+        {
+            Name = "クラスタ管理",
+            Description = "クラスタの設定管理",
+            Code = MenuCode.Cluster,
+            Url = "/cluster",
             ShowTopMenu = false,
             ShowSideMenu = true,
             MenuType = MenuType.System
@@ -569,6 +580,7 @@ namespace Nssol.Platypus.Logic
                     RoleMenu,
                     QuotaMenu,
                     NodeMenu,
+                    ClusterMenu,
                     UserMenu,
                     MenuAccessMenu,
                     ResourceMenu

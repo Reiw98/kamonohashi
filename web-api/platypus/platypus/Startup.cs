@@ -135,6 +135,7 @@ namespace Nssol.Platypus
             services.AddTransient<IUserRepository, UserRepository>();
             services.AddTransient<IMenuRepository, MenuRepository>();
             services.AddTransient<INodeRepository, NodeRepository>();
+            services.AddTransient<IClusterRepository, ClusterRepository>();
             services.AddTransient<ISettingRepository, SettingRepository>();
             services.AddTransient<INodeTenantMapRepository, NodeTenantMapRepository>();
 

@@ -1,47 +1,247 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Net;
-using System.Threading.Tasks;
-using Microsoft.AspNetCore.Http;
+﻿using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
-using Nssol.Platypus.Infrastructure;
+using Nssol.Platypus.ApiModels.ClusterApiModels;
 using Nssol.Platypus.Controllers.Util;
 using Nssol.Platypus.DataAccess.Core;
 using Nssol.Platypus.DataAccess.Repositories.Interfaces;
 using Nssol.Platypus.DataAccess.Repositories.Interfaces.TenantRepositories;
-using Nssol.Platypus.Logic.Interfaces;
-using Nssol.Platypus.Models.TenantModels;
-using Nssol.Platypus.Models;
-using Nssol.Platypus.ApiModels.ClusterApiModels;
+using Nssol.Platypus.Filters;
+using Nssol.Platypus.Infrastructure;
 using Nssol.Platypus.Infrastructure.Infos;
 using Nssol.Platypus.Infrastructure.Types;
+using Nssol.Platypus.Logic.Interfaces;
+using Nssol.Platypus.Models;
+using Nssol.Platypus.Models.TenantModels;
+using System.Collections.Generic;
+using System.Linq;
+using System.Net;
+using System.Threading.Tasks;
 
 namespace Nssol.Platypus.Controllers.spa
 {
     [Route("api/v1")]
     public class ClusterController : PlatypusApiControllerBase
     {
+        private readonly IClusterRepository clusterRepository;
         private readonly ITensorBoardContainerRepository tensorBoardContainerRepository;
         private readonly IClusterManagementLogic clusterManagementLogic;
         private readonly IUnitOfWork unitOfWork;
 
         public ClusterController(
-          ITensorBoardContainerRepository tensorBoardContainerRepository,
-          IClusterManagementLogic clusterManagementLogic,
-          IUnitOfWork unitOfWork,
-          IHttpContextAccessor accessor) : base(accessor)
+            IClusterRepository clusterRepository,
+            ITensorBoardContainerRepository tensorBoardContainerRepository,
+            IClusterManagementLogic clusterManagementLogic,
+            IUnitOfWork unitOfWork,
+            IHttpContextAccessor accessor) : base(accessor)
         {
+            this.clusterRepository = clusterRepository;
             this.tensorBoardContainerRepository = tensorBoardContainerRepository;
             this.clusterManagementLogic = clusterManagementLogic;
             this.unitOfWork = unitOfWork;
         }
 
+        #region クラスタ管理
+
+        /// <summary>
+        /// 全クラスタ一覧を取得
+        /// </summary>
+        [HttpGet("/api/v1/admin/cluster")]
+        [PermissionFilter(MenuCode.Cluster)]
+        [ProducesResponseType(typeof(IEnumerable<IndexOutputModel>), (int)HttpStatusCode.OK)]
+        public IActionResult GetAll()
+        {
+            var clusters = clusterRepository.GetAll();
+
+            return JsonOK(clusters.Select(c => new IndexOutputModel(c)));
+        }
+
+        /// <summary>
+        /// 指定されたIDのクラスタ情報を取得。
+        /// </summary>
+        /// <param name="id">取得対象のクラスタID</param>
+        [HttpGet("/api/v1/admin/cluster/{id}")]
+        [PermissionFilter(MenuCode.Cluster)]
+        [ProducesResponseType(typeof(DetailsOutputModel), (int)HttpStatusCode.OK)]
+        public async Task<IActionResult> GetDetail(long? id)
+        {
+            // データの入力チェック
+            if (!id.HasValue)
+            {
+                return JsonBadRequest("Cluster ID is required.");
+            }
+            // データの存在チェック
+            var cluster = await clusterRepository.GetByIdAsync(id.Value);
+            if (cluster == null)
+            {
+                return JsonNotFound($"Cluster Id {id.Value} is not found.");
+            }
+
+            var model = new DetailsOutputModel(cluster);
+
+            // アクセス可能なテナント情報を取得する
+            model.AssignedTenants = clusterRepository.GetAssignedTenants(cluster.Id).Select(t => new DetailsOutputModel.AssignedTenant()
+            {
+                Id = t.Id,
+                Name = t.Name,
+                DisplayName = t.DisplayName
+            });
+            
+            return JsonOK(model);
+        }
+
+        /// <summary>
+        /// 新規にクラスタを登録する
+        /// </summary>
+        /// <param name="model">登録するクラスタ情報</param>
+        /// <param name="tenantRepository">DI</param>
+        [HttpPost("/api/v1/admin/cluster")]
+        [PermissionFilter(MenuCode.Cluster)]
+        [ProducesResponseType(typeof(IndexOutputModel), (int)HttpStatusCode.Created)]
+        public IActionResult Create([FromBody]CreateInputModel model,
+            [FromServices] ITenantRepository tenantRepository)
+        {
+            // データの入力チェック
+            if (!ModelState.IsValid)
+            {
+                return JsonBadRequest("Invalid inputs.");
+            }
+
+            var cluster = new Cluster()
+            {
+                HostName = model.HostName,
+                DisplayName = model.DisplayName,
+                ResourceManageKey = model.ResourceManageKey,
+                Memo = model.Memo
+            };
+
+            // テナントをアサイン
+            if (model.AssignedTenantIds != null)
+            {
+                foreach (long tenantId in model.AssignedTenantIds)
+                {
+                    if (tenantRepository.Get(tenantId) == null)
+                    {
+                        return JsonNotFound($"Tenant ID {tenantId} is not found.");
+                    }
+                }
+                clusterRepository.AssignTenants(cluster, model.AssignedTenantIds, true);
+            }
+
+            clusterRepository.Add(cluster);
+            unitOfWork.Commit();
+
+            return JsonCreated(new IndexOutputModel(cluster));
+        }
+
+        /// <summary>
+        /// クラスタ情報の編集
+        /// </summary>
+        /// <param name="id">編集対象のクラスタID</param>
+        /// <param name="model">編集するクラスタ情報</param>
+        /// <param name="tenantRepository">DI</param>
+        [HttpPut("/api/v1/admin/cluster/{id}")]
+        [PermissionFilter(MenuCode.Cluster)]
+        [ProducesResponseType(typeof(IndexOutputModel), (int)HttpStatusCode.OK)]
+        public async Task<IActionResult> Edit(long? id, [FromBody]CreateInputModel model,
+            [FromServices] ITenantRepository tenantRepository) // EditとCreateで項目が同じなので、入力モデルを使いまわし
+        {
+            // データの入力チェック
+            if (!ModelState.IsValid || !id.HasValue)
+            {
+                return JsonBadRequest("Invalid inputs.");
+            }
+            // データの存在チェック
+            var cluster = await clusterRepository.GetByIdAsync(id.Value);
+            if (cluster == null)
+            {
+                return JsonNotFound($"Cluster ID {id.Value} is not found.");
+            }
+
+            // ClusterはCLIではなく画面から変更されるので、常にすべての値を入れ替える
+            cluster.HostName = model.HostName;
+            cluster.DisplayName = model.DisplayName;
+            cluster.ResourceManageKey = model.ResourceManageKey;
+            cluster.Memo = model.Memo;
+
+            // まずは全てのアサイン情報を削除する
+            clusterRepository.ResetAssinedTenants(cluster.Id);
+
+            // テナントをアサイン
+            if (model.AssignedTenantIds != null)
+            {
+                foreach (long tenantId in model.AssignedTenantIds)
+                {
+                    if (tenantRepository.Get(tenantId) == null)
+                    {
+                        return JsonNotFound($"Tenant ID {tenantId} is not found.");
+                    }
+                }
+                clusterRepository.AssignTenants(cluster, model.AssignedTenantIds, false);
+            }
+
+            unitOfWork.Commit();
+
+            return JsonOK(new IndexOutputModel(cluster));
+        }
+
+        /// <summary>
+        /// クラスタを削除する。
+        /// </summary>
+        /// <param name="id">削除対象のクラスタID</param>
+        [HttpDelete("{id}")]
+        [PermissionFilter(MenuCode.Cluster)]
+        [ProducesResponseType((int)HttpStatusCode.NoContent)]
+        public async Task<IActionResult> Delete(long? id)
+        {
+            //データの入力チェック
+            if (!id.HasValue)
+            {
+                return JsonBadRequest("Invalid inputs.");
+            }
+            //データの存在チェック
+            var cluster = await clusterRepository.GetByIdAsync(id.Value);
+            if (cluster == null)
+            {
+                return JsonNotFound($"Node ID {id.Value} is not found.");
+            }
+
+            // 全てのアサイン情報を削除する
+            clusterRepository.ResetAssinedTenants(cluster.Id);
+
+            // クラスタ情報を削除する
+            clusterRepository.Delete(cluster);
+
+            unitOfWork.Commit();
+
+            return JsonNoContent();
+        }
+
+        #endregion
+
+        #region クラスタアクセス
+
+        /// <summary>
+        /// 接続中のテナントに有効なクラスタの一覧を取得する。
+        /// </summary>
+        [HttpGet("/api/v1/cluster")]
+        [PermissionFilter(MenuCode.Training, MenuCode.Inference, MenuCode.Notebook)]
+        [ProducesResponseType(typeof(IEnumerable<SimpleOutputModel>), (int)HttpStatusCode.OK)]
+        public IActionResult GetClusters()
+        {
+            var clusters = clusterRepository.GetAccessibleClusters(CurrentUserInfo.SelectedTenant.Id);
+
+            return JsonOK(clusters.Select(c => new SimpleOutputModel(c)));
+        }
+
+        #endregion
+
+        #region パーティション
+
         /// <summary>
         /// 接続中のテナントに有効なパーティションの一覧を取得する。
         /// </summary>
         [HttpGet("tenant/partitions")]
-        [Filters.PermissionFilter(MenuCode.Training, MenuCode.Preprocess, MenuCode.Inference, MenuCode.Notebook)]
+        [PermissionFilter(MenuCode.Training, MenuCode.Preprocess, MenuCode.Inference, MenuCode.Notebook)]
         [ProducesResponseType(typeof(IEnumerable<string>), (int)HttpStatusCode.OK)]
         public IActionResult GetPartitions([FromServices] INodeRepository nodeRepository)
         {
@@ -55,7 +255,7 @@ namespace Nssol.Platypus.Controllers.spa
         /// パーティションの一覧を取得する。
         /// </summary>
         [HttpGet("admin/partitions")]
-        [Filters.PermissionFilter(MenuCode.Node)]
+        [PermissionFilter(MenuCode.Node)]
         [ProducesResponseType(typeof(IEnumerable<string>), (int)HttpStatusCode.OK)]
         public IActionResult GetPartitionsForAdmin([FromServices] INodeRepository nodeRepository)
         {
@@ -65,11 +265,15 @@ namespace Nssol.Platypus.Controllers.spa
             return JsonOK(partitions);
         }
 
+        #endregion
+
+        #region クォータ管理
+
         /// <summary>
         /// クォータ設定を取得する。
         /// </summary>
         [HttpGet("admin/quotas")]
-        [Filters.PermissionFilter(MenuCode.Quota)]
+        [PermissionFilter(MenuCode.Quota)]
         [ProducesResponseType(typeof(IEnumerable<QuotaOutputModel>), (int)HttpStatusCode.OK)]
         public IActionResult GetQuotas([FromServices] ITenantRepository tenantRepository)
         {
@@ -84,7 +288,7 @@ namespace Nssol.Platypus.Controllers.spa
         /// 0が指定された場合、上限なしを示す。また、指定のなかったテナントは更新しない。
         /// </remarks>
         [HttpPost("admin/quotas")]
-        [Filters.PermissionFilter(MenuCode.Quota)]
+        [PermissionFilter(MenuCode.Quota)]
         [ProducesResponseType(typeof(IEnumerable<QuotaOutputModel>), (int)HttpStatusCode.OK)]
         public async Task<IActionResult> EditQuotas([FromBody] IEnumerable<QuotaInputModel> models, [FromServices] ITenantRepository tenantRepository)
         {
@@ -120,6 +324,10 @@ namespace Nssol.Platypus.Controllers.spa
             return JsonOK(result);
         }
 
+        #endregion
+
+        #region TensorBoard
+
         /// <summary>
         /// DB上の全てのTensorBoardコンテナ情報を対応する実コンテナごと削除する。
         /// </summary>
@@ -127,7 +335,7 @@ namespace Nssol.Platypus.Controllers.spa
         /// REST APIとして定時バッチから実行される想定。
         /// </remarks>
         [HttpDelete("admin/tensorboards")]
-        [Filters.PermissionFilter(MenuCode.Node)]
+        [PermissionFilter(MenuCode.Node)]
         [ProducesResponseType(typeof(int), (int)HttpStatusCode.OK)]
         public async Task<IActionResult> DeleteAll()
         {
@@ -172,6 +380,8 @@ namespace Nssol.Platypus.Controllers.spa
             }
         }
 
+        #endregion
+
         /// <summary>
         /// イベントを取得する
         /// </summary>
@@ -179,7 +389,7 @@ namespace Nssol.Platypus.Controllers.spa
         /// <param name="name">コンテナ名</param>
         /// <param name="tenantRepository">DI用</param>
         [HttpGet("admin/events/{id}")]
-        [Filters.PermissionFilter(MenuCode.Tenant)]
+        [PermissionFilter(MenuCode.Tenant)]
         [ProducesResponseType(typeof(IEnumerable<ContainerEventInfo>), (int)HttpStatusCode.OK)]
         public async Task<IActionResult> GetEvents([FromRoute] long? id, [FromQuery] string name, [FromServices] ITenantRepository tenantRepository)
         {

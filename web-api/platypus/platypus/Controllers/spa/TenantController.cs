@@ -57,7 +57,7 @@ namespace Nssol.Platypus.Controllers.spa
         /// テナント一覧を取得
         /// </summary>
         [HttpGet]
-        [PermissionFilter(MenuCode.Tenant, MenuCode.User, MenuCode.Node)]
+        [PermissionFilter(MenuCode.Tenant, MenuCode.User, MenuCode.Node, MenuCode.Cluster)]
         [ProducesResponseType(typeof(IEnumerable<IndexOutputModel>), (int)HttpStatusCode.OK)]
         public IActionResult GetAll()
         {

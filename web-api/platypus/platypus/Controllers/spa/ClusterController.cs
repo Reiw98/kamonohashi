@@ -188,7 +188,7 @@ namespace Nssol.Platypus.Controllers.spa
         /// クラスタを削除する。
         /// </summary>
         /// <param name="id">削除対象のクラスタID</param>
-        [HttpDelete("{id}")]
+        [HttpDelete("/api/v1/admin/cluster/{id}")]
         [PermissionFilter(MenuCode.Cluster)]
         [ProducesResponseType((int)HttpStatusCode.NoContent)]
         public async Task<IActionResult> Delete(long? id)

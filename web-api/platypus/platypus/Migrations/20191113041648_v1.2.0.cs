@@ -1,5 +1,6 @@
 ﻿using Microsoft.EntityFrameworkCore.Migrations;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
+using Nssol.Platypus.Infrastructure;
 using System;
 
 namespace Nssol.Platypus.Migrations
@@ -122,6 +123,13 @@ namespace Nssol.Platypus.Migrations
                 principalTable: "Cluster",
                 principalColumn: "Id",
                 onDelete: ReferentialAction.Restrict);
+
+            // 共通変数
+            string adminUser = ApplicationConst.DefaultFirstAdminUserName;
+            DateTime now = DateTime.Now;
+
+            // MenuRoleMapsにクラスタ管理と"admins"ロールとの紐づけを追加
+            migrationBuilder.Sql($"INSERT INTO \"MenuRoleMaps\" (\"Id\", \"CreatedBy\", \"CreatedAt\", \"ModifiedBy\", \"ModifiedAt\", \"MenuCode\", \"RoleId\") SELECT nextval('\"MenuRoleMaps_Id_seq\"'), '{adminUser}', '{now}', '{adminUser}', '{now}', '{Logic.MenuLogic.ClusterMenu.Code.ToString()}', \"Id\" FROM \"Roles\" WHERE \"Name\" = 'admins';");
         }
 
         protected override void Down(MigrationBuilder migrationBuilder)
@@ -167,6 +175,9 @@ namespace Nssol.Platypus.Migrations
             migrationBuilder.DropColumn(
                 name: "ClusterId",
                 table: "InferenceHistories");
+
+            // MenuRoleMapsからクラスタ管理のアクセス権を削除する
+            migrationBuilder.Sql($"DELETE FROM \"MenuRoleMaps\" WHERE \"MenuCode\" = '{Logic.MenuLogic.ClusterMenu.Code.ToString()}';");
         }
     }
 }

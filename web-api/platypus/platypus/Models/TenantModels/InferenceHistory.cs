@@ -160,6 +160,11 @@ namespace Nssol.Platypus.Models.TenantModels
         public bool Zip { get; set; }
 
         /// <summary>
+        /// コンテナ実行するクラスタID
+        /// </summary>
+        public long? ClusterId { get; set; }
+
+        /// <summary>
         /// データセット
         /// </summary>
         [ForeignKey(nameof(DataSetId))]
@@ -174,6 +179,12 @@ namespace Nssol.Platypus.Models.TenantModels
         /// </summary>
         [ForeignKey(nameof(ContainerRegistryId))]
         public virtual Registry ContainerRegistry { get; set; }
+
+        /// <summary>
+        /// クラスタ
+        /// </summary>
+        [ForeignKey(nameof(ClusterId))]
+        public virtual Cluster Cluster { get; set; }
 
         /// <summary>
         /// 推論履歴添付ファイル

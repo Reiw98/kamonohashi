@@ -4,7 +4,7 @@ using System.ComponentModel.DataAnnotations;
 namespace Nssol.Platypus.Models
 {
     /// <summary>
-    /// クラスタノード
+    /// ノード
     /// </summary>
     public class Node : ModelBase
     {

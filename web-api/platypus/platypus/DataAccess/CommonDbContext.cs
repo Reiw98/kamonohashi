@@ -74,14 +74,24 @@ namespace Nssol.Platypus.DataAccess
         public virtual DbSet<Storage> Storages { get; set; }
 
         /// <summary>
-        /// クラスタノード
+        /// ノード
         /// </summary>
         public virtual DbSet<Node> Nodes { get; set; }
 
         /// <summary>
-        /// クラスタノードとテナントの中間テーブル
+        /// ノードとテナントの中間テーブル
         /// </summary>
         public virtual DbSet<NodeTenantMap> NodeTenantMaps { get; set; }
+
+        /// <summary>
+        /// クラスタ
+        /// </summary>
+        public virtual DbSet<Cluster> Cluster { get; set; }
+
+        /// <summary>
+        /// クラスタとテナントの中間テーブル
+        /// </summary>
+        public virtual DbSet<ClusterTenantMap> ClusterTenantMaps { get; set; }
 
         /// <summary>
         /// ユーザとロールの中間テーブル
@@ -221,6 +231,9 @@ namespace Nssol.Platypus.DataAccess
                     .IsUnique();
             modelBuilder.Entity<NodeTenantMap>()
                     .HasIndex(e => new { e.NodeId, e.TenantId })
+                    .IsUnique();
+            modelBuilder.Entity<ClusterTenantMap>()
+                    .HasIndex(e => new { e.ClusterId, e.TenantId })
                     .IsUnique();
             modelBuilder.Entity<TenantGitMap>()
                     .HasIndex(e => new { e.TenantId, e.GitId })

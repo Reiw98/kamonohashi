@@ -160,6 +160,11 @@ namespace Nssol.Platypus.Models.TenantModels
         public int? ExpiresIn { get; set; }
 
         /// <summary>
+        /// コンテナ実行するクラスタID
+        /// </summary>
+        public long? ClusterId { get; set; }
+
+        /// <summary>
         /// データセット
         /// </summary>
         [ForeignKey(nameof(DataSetId))]
@@ -170,6 +175,12 @@ namespace Nssol.Platypus.Models.TenantModels
         /// </summary>
         [ForeignKey(nameof(ContainerRegistryId))]
         public virtual Registry ContainerRegistry { get; set; }
+
+        /// <summary>
+        /// クラスタ
+        /// </summary>
+        [ForeignKey(nameof(ClusterId))]
+        public virtual Cluster Cluster { get; set; }
 
         /// <summary>
         /// コンテナ起動時に使用する名前

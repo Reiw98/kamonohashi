@@ -62,6 +62,7 @@ namespace Nssol.Platypus.DataAccess.Repositories.TenantRepositories
                 .Include(t => t.Parent)
                 .Include(t => t.TrainingHistoryAttachedFile)
                 .Include(t => t.ContainerRegistry)
+                .Include(t => t.Cluster)
                 .SingleOrDefaultAsync();
         }
 

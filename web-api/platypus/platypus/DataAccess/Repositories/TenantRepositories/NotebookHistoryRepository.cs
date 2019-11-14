@@ -51,6 +51,7 @@ namespace Nssol.Platypus.DataAccess.Repositories.TenantRepositories
         {
             return await FindAll(t => t.Id == id).Include(t => t.DataSet)
                 .Include(t => t.ContainerRegistry)
+                .Include(t => t.Cluster)
                 .SingleOrDefaultAsync();
         }
 

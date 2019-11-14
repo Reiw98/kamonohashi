@@ -21,6 +21,9 @@ using System.Threading.Tasks;
 
 namespace Nssol.Platypus.Controllers.spa
 {
+    /// <summary>
+    /// Notebookを扱うためのAPI集
+    /// </summary>
     [Route("api/v1/notebook")]
     public class NotebookController : PlatypusApiControllerBase
     {
@@ -94,6 +97,7 @@ namespace Nssol.Platypus.Controllers.spa
         /// <summary>
         /// ステータスを更新して、出力モデルに変換する
         /// </summary>
+        /// <param name="history">ノートブック履歴</param>
         private async Task<IndexOutputModel> GetUpdatedIndexOutputModelAsync(NotebookHistory history)
         {
             var model = new IndexOutputModel(history);
@@ -119,6 +123,7 @@ namespace Nssol.Platypus.Controllers.spa
         /// <summary>
         /// データ件数を取得する
         /// </summary>
+        /// <param name="filter">検索条件</param>
         private int GetTotalCount(SearchInputModel filter)
         {
             IQueryable<NotebookHistory> histories;
@@ -130,6 +135,8 @@ namespace Nssol.Platypus.Controllers.spa
         /// <summary>
         /// 検索条件の追加
         /// </summary>
+        /// <param name="sourceData">ノートブック履歴加工前</param>
+        /// <param name="filter">検索条件</param>
         private static IQueryable<NotebookHistory> Search(IQueryable<NotebookHistory> sourceData, SearchInputModel filter)
         {
             IQueryable<NotebookHistory> data = sourceData;
@@ -387,6 +394,8 @@ namespace Nssol.Platypus.Controllers.spa
         /// <summary>
         /// 新規にノートブックコンテナを開始する
         /// </summary>
+        /// <param name="model">新規実行情報</param>
+        /// <param name="nodeRepository">DI用</param>
         [HttpPost("run")]
         [Filters.PermissionFilter(MenuCode.Notebook)]
         [ProducesResponseType(typeof(SimpleOutputModel), (int)HttpStatusCode.Created)]
@@ -409,6 +418,13 @@ namespace Nssol.Platypus.Controllers.spa
             }
             if (string.IsNullOrEmpty(model.Partition) == false)
             {
+                // パーティションとクラスタIDの両方とも入力されている場合エラー
+                if (model.ClusterId.HasValue)
+                {
+                    return JsonNotFound($"There are inputs for both partition {model.Partition} and clusterId {model.ClusterId}.");
+                }
+
+                // 指定したパーティションが存在するかチェック
                 bool existPartition = await nodeRepository.IsEnablePartitionAsync(model.Partition, true);
                 if (existPartition == false)
                 {
@@ -445,7 +461,8 @@ namespace Nssol.Platypus.Controllers.spa
                 Memo = model.Memo,
                 Status = ContainerStatus.Running.Key,
                 StartedAt = DateTime.Now,
-                ExpiresIn = model.ExpiresIn
+                ExpiresIn = model.ExpiresIn,
+                ClusterId = model.ClusterId
             };
 
             //コンテナが指定されているかチェック
@@ -620,6 +637,9 @@ namespace Nssol.Platypus.Controllers.spa
         /// <summary>
         /// 指定されたノートブック履歴のコンテナを再起動する
         /// </summary>
+        /// <param name="id">再実行対象のノートブックID</param>
+        /// <param name="model">再実行情報</param>
+        /// <param name="nodeRepository">DI用</param>
         [HttpPost("{id}/rerun")]
         [Filters.PermissionFilter(MenuCode.Notebook)]
         [ProducesResponseType(typeof(SimpleOutputModel), (int)HttpStatusCode.Created)]

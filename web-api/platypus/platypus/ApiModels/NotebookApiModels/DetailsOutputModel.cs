@@ -7,6 +7,9 @@ using System.Globalization;
 
 namespace Nssol.Platypus.ApiModels.NotebookApiModels
 {
+    /// <summary>
+    /// ノートブック履歴詳細情報
+    /// </summary>
     public class DetailsOutputModel : IndexOutputModel
     {
         public DetailsOutputModel(NotebookHistory history) : base(history)
@@ -43,6 +46,7 @@ namespace Nssol.Platypus.ApiModels.NotebookApiModels
             Memory = history.Memory;
             Gpu = history.Gpu;
             Partition = history.Partition;
+            Cluster = history.Cluster == null ? null : new ClusterApiModels.SimpleOutputModel(history.Cluster);
 
             ExpiresIn = history.ExpiresIn;
 
@@ -115,6 +119,11 @@ namespace Nssol.Platypus.ApiModels.NotebookApiModels
         /// パーティション
         /// </summary>
         public string Partition { get; set; }
+
+        /// <summary>
+        /// クラスタ
+        /// </summary>
+        public ClusterApiModels.SimpleOutputModel Cluster { get; set; }
 
         /// <summary>
         /// ステータスの種類。

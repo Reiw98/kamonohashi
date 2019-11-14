@@ -4,6 +4,12 @@ using System.ComponentModel.DataAnnotations;
 
 namespace Nssol.Platypus.ApiModels.TrainingApiModels
 {
+    /// <summary>
+    /// 学習新規実行に必要な情報を保持する
+    /// </summary>
+    /// <remarks>
+    /// 推論新規実行時にも使用する
+    /// </remarks>
     public class CreateInputModel
     {
         /// <summary>
@@ -61,6 +67,12 @@ namespace Nssol.Platypus.ApiModels.TrainingApiModels
         /// パーティション
         /// </summary>
         public string Partition { get; set; }
+
+        /// <summary>
+        /// クラスタID
+        /// </summary>
+        public long? ClusterId { get; set; }
+
         /// <summary>
         /// メモ
         /// </summary>

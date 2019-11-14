@@ -4,6 +4,9 @@ using System.ComponentModel.DataAnnotations;
 
 namespace Nssol.Platypus.ApiModels.NotebookApiModels
 {
+    /// <summary>
+    /// ノートブック新規実行に必要な情報を保持する
+    /// </summary>
     public class CreateInputModel
     {
         /// <summary>
@@ -55,7 +58,12 @@ namespace Nssol.Platypus.ApiModels.NotebookApiModels
         /// パーティション
         /// </summary>
         public string Partition { get; set; }
-        
+
+        /// <summary>
+        /// クラスタID
+        /// </summary>
+        public long? ClusterId { get; set; }
+
         /// <summary>
         /// メモ
         /// </summary>

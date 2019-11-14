@@ -6,6 +6,9 @@ using System.Collections.Generic;
 
 namespace Nssol.Platypus.ApiModels.InferenceApiModels
 {
+    /// <summary>
+    /// 推論履歴詳細情報
+    /// </summary>
     public class InferenceDetailsOutputModel : InferenceIndexOutputModel
     {
         public InferenceDetailsOutputModel(InferenceHistory history) : base(history)
@@ -39,6 +42,7 @@ namespace Nssol.Platypus.ApiModels.InferenceApiModels
             Memory = history.Memory;
             Gpu = history.Gpu;
             Partition = history.Partition;
+            Cluster = history.Cluster == null ? null : new ClusterApiModels.SimpleOutputModel(history.Cluster);
 
             Zip = history.Zip;
 
@@ -110,6 +114,11 @@ namespace Nssol.Platypus.ApiModels.InferenceApiModels
         /// パーティション
         /// </summary>
         public string Partition { get; set; }
+
+        /// <summary>
+        /// クラスタ
+        /// </summary>
+        public ClusterApiModels.SimpleOutputModel Cluster { get; set; }
 
         /// <summary>
         /// ステータスの種類。

@@ -101,6 +101,7 @@ namespace Nssol.Platypus.Controllers.spa
         /// <summary>
         /// ステータスを更新して、出力モデルに変換する
         /// </summary>
+        /// <param name="history">推論履歴</param>
         private async Task<InferenceIndexOutputModel> GetUpdatedIndexOutputModelAsync(InferenceHistory history)
         {
             var model = new InferenceIndexOutputModel(history);
@@ -135,6 +136,7 @@ namespace Nssol.Platypus.Controllers.spa
         /// <summary>
         /// データ件数を取得する
         /// </summary>
+        /// <param name="filter">検索条件</param>
         private int GetTotalCount(InferenceSearchInputModel filter)
         {
             IQueryable<InferenceHistory> histories;
@@ -155,6 +157,8 @@ namespace Nssol.Platypus.Controllers.spa
         /// <summary>
         /// 検索条件の追加
         /// </summary>
+        /// <param name="sourceData">推論履歴加工前</param>
+        /// <param name="filter">検索条件</param>
         private static IQueryable<InferenceHistory> Search(IQueryable<InferenceHistory> sourceData, InferenceSearchInputModel filter)
         {
             IQueryable<InferenceHistory> data = sourceData;
@@ -268,6 +272,8 @@ namespace Nssol.Platypus.Controllers.spa
         /// <summary>
         /// 新規に推論を開始
         /// </summary>
+        /// <param name="model">新規実行情報</param>
+        /// <param name="nodeRepository">DI用</param>
         [HttpPost("run")]
         [Filters.PermissionFilter(MenuCode.Inference)]
         [ProducesResponseType(typeof(InferenceSimpleOutputModel), (int)HttpStatusCode.Created)]
@@ -295,6 +301,13 @@ namespace Nssol.Platypus.Controllers.spa
             }
             if (string.IsNullOrEmpty(model.Partition) == false)
             {
+                // パーティションとクラスタIDの両方とも入力されている場合エラー
+                if (model.ClusterId.HasValue)
+                {
+                    return JsonNotFound($"There are inputs for both partition {model.Partition} and clusterId {model.ClusterId}.");
+                }
+
+                // 指定したパーティションが存在するかチェック
                 bool existPartition = await nodeRepository.IsEnablePartitionAsync(model.Partition, true);
                 if (existPartition == false)
                 {
@@ -355,7 +368,8 @@ namespace Nssol.Platypus.Controllers.spa
                 Gpu = model.Gpu.Value,
                 Partition = model.Partition,
                 Status = ContainerStatus.Running.Key,
-                Zip = model.Zip
+                Zip = model.Zip,
+                ClusterId = model.ClusterId
             };
 
             if (inferenceHistory.OptionDic.ContainsKey("")) //空文字は除外する

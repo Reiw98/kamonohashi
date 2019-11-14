@@ -7,6 +7,9 @@ using System.Globalization;
 
 namespace Nssol.Platypus.ApiModels.TrainingApiModels
 {
+    /// <summary>
+    /// 学習履歴詳細情報
+    /// </summary>
     public class DetailsOutputModel : IndexOutputModel
     {
         public DetailsOutputModel(TrainingHistory history) : base(history)
@@ -40,6 +43,7 @@ namespace Nssol.Platypus.ApiModels.TrainingApiModels
             Memory = history.Memory;
             Gpu = history.Gpu;
             Partition = history.Partition;
+            Cluster = history.Cluster == null ? null : new ClusterApiModels.SimpleOutputModel(history.Cluster);
 
             Zip = history.Zip;
 
@@ -114,6 +118,11 @@ namespace Nssol.Platypus.ApiModels.TrainingApiModels
         /// パーティション
         /// </summary>
         public string Partition { get; set; }
+
+        /// <summary>
+        /// クラスタ
+        /// </summary>
+        public ClusterApiModels.SimpleOutputModel Cluster { get; set; }
 
         /// <summary>
         /// ステータスの種類。

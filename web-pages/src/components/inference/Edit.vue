@@ -109,7 +109,8 @@
             <pl-display-text-form label="CPU" :value="cpu"/>
             <pl-display-text-form label="メモリ(GB)" :value="memory"/>
             <pl-display-text-form label="GPU" :value="gpu"/>
-            <pl-display-text-form label="パーティション" :value="partition"/>
+            <pl-display-text-form label="クラスタ" :value="clusterName" v-if="clusterName"/>
+            <pl-display-text-form label="パーティション" :value="partition" v-else/>
             <pl-display-text-form label="ステータス" :value="status"/>
             <div class="k8s-event" v-if="conditionNote !== `` ">{{ conditionNote}}</div>
             <div class="k8s-event" v-if="events.length">
@@ -227,6 +228,7 @@
         memory: undefined,
         gpu: undefined,
         partition: undefined,
+        clusterName: undefined,
         // スクリプトがこけたときなどに"failed"になる
         status: undefined,
         // コンテナの生死等
@@ -319,6 +321,7 @@
         this.memory = data.memory
         this.gpu = data.gpu
         this.partition = data.partition
+        this.clusterName = data.cluster ? data.cluster.displayName : ''
         this.statusDetail = data.statusDetail
         this.status = data.status === data.statusType
           ? data.status : (data.statusType + ' (' + data.status + ')')

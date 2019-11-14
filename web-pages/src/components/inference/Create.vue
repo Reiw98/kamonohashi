@@ -68,12 +68,32 @@
                           active-text="圧縮する"/>
               </el-form-item>
 
-              <el-form-item label="パーティション" prop="partition">
+              <template v-if="this.clusters && this.clusters.length > 0">
+                <el-form-item label="オンプレミス">
+                  <el-switch v-model="onPremises"
+                            style="width: 100%;"
+                            inactive-text="クラウド"
+                            active-text="オンプレ"/>
+                </el-form-item>
+              </template>
+              <el-form-item label="パーティション" prop="partition" v-if="onPremises">
                 <pl-string-selector v-if="partitions"
                                     v-model="partition"
                                     :valueList="partitions"
                 />
               </el-form-item>
+              <template v-if="this.clusters && this.clusters.length > 0">
+                <el-form-item label="クラスタ" v-if="!onPremises">
+                  <el-select class="el-input" v-model="clusterId" :clearable="true">
+                    <el-option
+                      v-for="cluster in clusters"
+                      :key="cluster.id"
+                      :label="getClusterLabel(cluster.id, cluster.displayName)"
+                      :value="cluster.id">
+                    </el-option>
+                  </el-select>
+                </el-form-item>
+              </template>
 
               <el-form-item label="メモ">
                 <el-input
@@ -173,13 +193,33 @@
                               inactive-text="圧縮しない"
                               active-text="圧縮する"/>
                   </el-form-item>
-                  <el-form-item label="パーティション" prop="partition">
+                  <template v-if="this.clusters && this.clusters.length > 0">
+                    <el-form-item label="オンプレミス">
+                      <el-switch v-model="onPremises"
+                                style="width: 100%;"
+                                inactive-text="クラウド"
+                                active-text="オンプレ"/>
+                    </el-form-item>
+                  </template>
+                  <el-form-item label="パーティション" prop="partition" v-if="onPremises">
                     <pl-string-selector
                       v-if="partitions"
                       v-model="partition"
                       :valueList="partitions"
                     />
                   </el-form-item>
+                  <template v-if="this.clusters && this.clusters.length > 0">
+                    <el-form-item label="クラスタ" v-if="!onPremises">
+                      <el-select class="el-input" v-model="clusterId" :clearable="true">
+                        <el-option
+                          v-for="cluster in clusters"
+                          :key="cluster.id"
+                          :label="getClusterLabel(cluster.id, cluster.displayName)"
+                          :value="cluster.id">
+                        </el-option>
+                      </el-select>
+                    </el-form-item>
+                  </template>
                   <el-form-item label="メモ">
                     <el-input
                       type="textarea"
@@ -267,11 +307,15 @@
         options: undefined,
         entryPoint: undefined,
         zip: true,
+        onPremises: true,
+        clusters: undefined,
+        clusterId: undefined,
         active: 0
       }
     },
     async created () {
       this.partitions = (await api.cluster.getPartitions()).data
+      this.clusters = (await api.cluster.getClusters()).data
       let origin = this.$route.query.origin
       if (origin === 'train') {
         let parent = (await api.training.getById({id: this.originId})).data
@@ -312,7 +356,8 @@
                   Cpu: this.cpu,
                   Memory: this.memory,
                   Gpu: this.gpu,
-                  Partition: this.partition,
+                  Partition: this.onPremises ? this.partition : null,
+                  ClusterId: this.onPremises ? null : this.clusterId,
                   Memo: this.memo,
                   Zip: this.zip
                 }
@@ -349,6 +394,12 @@
           if (origin.parent) {
             this.parent = origin.parent
           }
+          if (this.clusters && this.clusters.length > 0) {
+            if (origin.cluster) {
+              this.onPremises = false
+              this.clusterId = origin.cluster.id
+            }
+          }
         }
       },
       emitDone () {
@@ -372,6 +423,9 @@
         if (this.active-- < 0) {
           this.active = 0
         }
+      },
+      getClusterLabel (id, name) {
+        return id + ':' + name
       }
     }
 

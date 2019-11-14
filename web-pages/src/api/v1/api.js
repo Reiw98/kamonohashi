@@ -33,7 +33,7 @@ let simpleStringBody = function (func, paramName) {
 // （swagger-vue で自動生成生成：https://github.com/chenweiqun/swagger-vue）
 let api = {
   cluster: {
-    getCluster: gen.ApiV1ClusterGet,
+    getClusters: gen.ApiV1ClusterGet,
     getPartitions: gen.ApiV1TenantPartitionsGet,
 
     admin: {

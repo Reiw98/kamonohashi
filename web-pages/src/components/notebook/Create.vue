@@ -137,13 +137,33 @@
                   <el-form-item label="環境変数">
                     <pl-dynamic-multi-input v-model="options"/>
                   </el-form-item>
-                  <el-form-item label="パーティション" prop="partition">
+                  <template v-if="this.clusters && this.clusters.length > 0">
+                    <el-form-item label="オンプレミス">
+                      <el-switch v-model="onPremises"
+                                style="width: 100%;"
+                                inactive-text="クラウド"
+                                active-text="オンプレ"/>
+                    </el-form-item>
+                  </template>
+                  <el-form-item label="パーティション" prop="partition" v-if="onPremises">
                     <pl-string-selector
                       v-if="partitions"
                       v-model="partition"
                       :valueList="partitions"
                     />
                   </el-form-item>
+                  <template v-if="this.clusters && this.clusters.length > 0">
+                    <el-form-item label="クラスタ" v-if="!onPremises">
+                      <el-select class="el-input" v-model="clusterId" :clearable="true">
+                        <el-option
+                          v-for="cluster in clusters"
+                          :key="cluster.id"
+                          :label="getClusterLabel(cluster.id, cluster.displayName)"
+                          :value="cluster.id">
+                        </el-option>
+                      </el-select>
+                    </el-form-item>
+                  </template>
                   <el-form-item label="メモ">
                     <el-input
                       type="textarea"
@@ -223,13 +243,16 @@
         memo: undefined,
         git: undefined,
         options: undefined,
+        onPremises: true,
+        clusters: undefined,
+        clusterId: undefined,
         active: 0,
         expiresIn: 8
       }
     },
     async created () {
-      let result = await (api.cluster.getPartitions())
-      this.partitions = result.data
+      this.partitions = (await api.cluster.getPartitions()).data
+      this.clusters = (await api.cluster.getClusters()).data
       await this.retrieveOriginNotebook()
     },
     methods: {
@@ -252,7 +275,8 @@
                 cpu: this.cpu,
                 memory: this.memory,
                 gpu: this.gpu,
-                partition: this.partition,
+                Partition: this.onPremises ? this.partition : null,
+                ClusterId: this.onPremises ? null : this.clusterId,
                 memo: this.memo,
                 expiresIn: this.expiresIn * 60 * 60
               }
@@ -336,7 +360,16 @@
           if (origin.parent) {
             this.parent = origin.parent
           }
+          if (this.clusters && this.clusters.length > 0) {
+            if (origin.cluster) {
+              this.onPremises = false
+              this.clusterId = origin.cluster.id
+            }
+          }
         }
+      },
+      getClusterLabel (id, name) {
+        return id + ':' + name
       }
     }
   }

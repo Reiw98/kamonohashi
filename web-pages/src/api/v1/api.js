@@ -33,9 +33,15 @@ let simpleStringBody = function (func, paramName) {
 // （swagger-vue で自動生成生成：https://github.com/chenweiqun/swagger-vue）
 let api = {
   cluster: {
+    getCluster: gen.ApiV1ClusterGet,
     getPartitions: gen.ApiV1TenantPartitionsGet,
 
     admin: {
+      get: gen.ApiV1AdminClusterGet,
+      post: gen.ApiV1AdminClusterPost,
+      getById: gen.ApiV1AdminClusterByIdGet,
+      put: gen.ApiV1AdminClusterByIdPut,
+      delete: gen.ApiV1AdminClusterByIdDelete,
       getQuotas: gen.ApiV1AdminQuotasGet,
       postQuota: gen.ApiV1AdminQuotasPost,
       deleteTensorboards: gen.ApiV1AdminTensorboardsDelete

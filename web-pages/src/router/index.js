@@ -68,6 +68,10 @@ import NodeIndex from '@/components/system-setting/node/Index'
 import NodeCreate from '@/components/system-setting/node/Create'
 import NodeEdit from '@/components/system-setting/node/Edit'
 
+import ClusterIndex from '@/components/system-setting/cluster/Index'
+import ClusterCreate from '@/components/system-setting/cluster/Create'
+import ClusterEdit from '@/components/system-setting/cluster/Edit'
+
 import UserIndex from '@/components/system-setting/user/Index'
 import UserCreate from '@/components/system-setting/user/Create'
 import UserEdit from '@/components/system-setting/user/Edit'
@@ -425,7 +429,7 @@ let router = new Router({
     },
     {
       path: '/node',
-      name: 'Node,',
+      name: 'Node',
       component: NodeIndex,
       children: [
         {
@@ -435,6 +439,22 @@ let router = new Router({
         {
           path: ':id',
           component: NodeEdit,
+          props: true
+        }
+      ]
+    },
+    {
+      path: '/cluster',
+      name: 'Cluster',
+      component: ClusterIndex,
+      children: [
+        {
+          path: 'create',
+          component: ClusterCreate
+        },
+        {
+          path: ':id',
+          component: ClusterEdit,
           props: true
         }
       ]

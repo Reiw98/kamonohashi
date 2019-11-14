@@ -519,6 +519,266 @@ export const ApiV1AccountRegistriesPutURL = function(parameters = {}) {
   return domain + path + (keys.length > 0 ? '?' + (keys.map(key => key + '=' + encodeURIComponent(queryParameters[key])).join('&')) : '')
 }
 /**
+ * 全クラスタ一覧を取得する
+ * request: ApiV1AdminClusterGet
+ * url: ApiV1AdminClusterGetURL
+ * method: ApiV1AdminClusterGet_TYPE
+ * raw_url: ApiV1AdminClusterGet_RAW_URL
+ */
+export const ApiV1AdminClusterGet = function(parameters = {}) {
+  const domain = parameters.$domain ? parameters.$domain : getDomain()
+  const config = parameters.$config
+  let path = '/api/v1/admin/cluster'
+  let body
+  let queryParameters = {}
+  let form = {}
+  if (parameters.$queryParameters) {
+    Object.keys(parameters.$queryParameters).forEach(function(parameterName) {
+      queryParameters[parameterName] = parameters.$queryParameters[parameterName]
+    });
+  }
+  return request('get', domain + path, body, queryParameters, form, config)
+}
+export const ApiV1AdminClusterGet_RAW_URL = function() {
+  return '/api/v1/admin/cluster'
+}
+export const ApiV1AdminClusterGet_TYPE = function() {
+  return 'get'
+}
+export const ApiV1AdminClusterGetURL = function(parameters = {}) {
+  let queryParameters = {}
+  const domain = parameters.$domain ? parameters.$domain : getDomain()
+  let path = '/api/v1/admin/cluster'
+  if (parameters.$queryParameters) {
+    Object.keys(parameters.$queryParameters).forEach(function(parameterName) {
+      queryParameters[parameterName] = parameters.$queryParameters[parameterName]
+    })
+  }
+  let keys = Object.keys(queryParameters)
+  return domain + path + (keys.length > 0 ? '?' + (keys.map(key => key + '=' + encodeURIComponent(queryParameters[key])).join('&')) : '')
+}
+/**
+ * 新規にクラスタを登録する
+ * request: ApiV1AdminClusterPost
+ * url: ApiV1AdminClusterPostURL
+ * method: ApiV1AdminClusterPost_TYPE
+ * raw_url: ApiV1AdminClusterPost_RAW_URL
+ * @param model - 登録するクラスタ情報
+ */
+export const ApiV1AdminClusterPost = function(parameters = {}) {
+  const domain = parameters.$domain ? parameters.$domain : getDomain()
+  const config = parameters.$config
+  let path = '/api/v1/admin/cluster'
+  let body
+  let queryParameters = {}
+  let form = {}
+  if (parameters['model'] !== undefined) {
+    body = parameters['model']
+  }
+  if (parameters.$queryParameters) {
+    Object.keys(parameters.$queryParameters).forEach(function(parameterName) {
+      queryParameters[parameterName] = parameters.$queryParameters[parameterName]
+    });
+  }
+  return request('post', domain + path, body, queryParameters, form, config)
+}
+export const ApiV1AdminClusterPost_RAW_URL = function() {
+  return '/api/v1/admin/cluster'
+}
+export const ApiV1AdminClusterPost_TYPE = function() {
+  return 'post'
+}
+export const ApiV1AdminClusterPostURL = function(parameters = {}) {
+  let queryParameters = {}
+  const domain = parameters.$domain ? parameters.$domain : getDomain()
+  let path = '/api/v1/admin/cluster'
+  if (parameters.$queryParameters) {
+    Object.keys(parameters.$queryParameters).forEach(function(parameterName) {
+      queryParameters[parameterName] = parameters.$queryParameters[parameterName]
+    })
+  }
+  let keys = Object.keys(queryParameters)
+  return domain + path + (keys.length > 0 ? '?' + (keys.map(key => key + '=' + encodeURIComponent(queryParameters[key])).join('&')) : '')
+}
+/**
+ * 指定したIDのクラスタ情報を取得する
+ * request: ApiV1AdminClusterByIdGet
+ * url: ApiV1AdminClusterByIdGetURL
+ * method: ApiV1AdminClusterByIdGet_TYPE
+ * raw_url: ApiV1AdminClusterByIdGet_RAW_URL
+ * @param id - 取得対象のクラスタID
+ */
+export const ApiV1AdminClusterByIdGet = function(parameters = {}) {
+  const domain = parameters.$domain ? parameters.$domain : getDomain()
+  const config = parameters.$config
+  let path = '/api/v1/admin/cluster/{id}'
+  let body
+  let queryParameters = {}
+  let form = {}
+  path = path.replace('{id}', `${parameters['id']}`)
+  if (parameters['id'] === undefined) {
+    return Promise.reject(new Error('Missing required  parameter: id'))
+  }
+  if (parameters.$queryParameters) {
+    Object.keys(parameters.$queryParameters).forEach(function(parameterName) {
+      queryParameters[parameterName] = parameters.$queryParameters[parameterName]
+    });
+  }
+  return request('get', domain + path, body, queryParameters, form, config)
+}
+export const ApiV1AdminClusterByIdGet_RAW_URL = function() {
+  return '/api/v1/admin/cluster/{id}'
+}
+export const ApiV1AdminClusterByIdGet_TYPE = function() {
+  return 'get'
+}
+export const ApiV1AdminClusterByIdGetURL = function(parameters = {}) {
+  let queryParameters = {}
+  const domain = parameters.$domain ? parameters.$domain : getDomain()
+  let path = '/api/v1/admin/cluster/{id}'
+  path = path.replace('{id}', `${parameters['id']}`)
+  if (parameters.$queryParameters) {
+    Object.keys(parameters.$queryParameters).forEach(function(parameterName) {
+      queryParameters[parameterName] = parameters.$queryParameters[parameterName]
+    })
+  }
+  let keys = Object.keys(queryParameters)
+  return domain + path + (keys.length > 0 ? '?' + (keys.map(key => key + '=' + encodeURIComponent(queryParameters[key])).join('&')) : '')
+}
+/**
+ * 指定したIDのクラスタ情報を編集する
+ * request: ApiV1AdminClusterByIdPut
+ * url: ApiV1AdminClusterByIdPutURL
+ * method: ApiV1AdminClusterByIdPut_TYPE
+ * raw_url: ApiV1AdminClusterByIdPut_RAW_URL
+ * @param id - 編集対象のクラスタID
+ * @param model - 編集するクラスタ情報
+ */
+export const ApiV1AdminClusterByIdPut = function(parameters = {}) {
+  const domain = parameters.$domain ? parameters.$domain : getDomain()
+  const config = parameters.$config
+  let path = '/api/v1/admin/cluster/{id}'
+  let body
+  let queryParameters = {}
+  let form = {}
+  path = path.replace('{id}', `${parameters['id']}`)
+  if (parameters['id'] === undefined) {
+    return Promise.reject(new Error('Missing required  parameter: id'))
+  }
+  if (parameters['model'] !== undefined) {
+    body = parameters['model']
+  }
+  if (parameters.$queryParameters) {
+    Object.keys(parameters.$queryParameters).forEach(function(parameterName) {
+      queryParameters[parameterName] = parameters.$queryParameters[parameterName]
+    });
+  }
+  return request('put', domain + path, body, queryParameters, form, config)
+}
+export const ApiV1AdminClusterByIdPut_RAW_URL = function() {
+  return '/api/v1/admin/cluster/{id}'
+}
+export const ApiV1AdminClusterByIdPut_TYPE = function() {
+  return 'put'
+}
+export const ApiV1AdminClusterByIdPutURL = function(parameters = {}) {
+  let queryParameters = {}
+  const domain = parameters.$domain ? parameters.$domain : getDomain()
+  let path = '/api/v1/admin/cluster/{id}'
+  path = path.replace('{id}', `${parameters['id']}`)
+  if (parameters.$queryParameters) {
+    Object.keys(parameters.$queryParameters).forEach(function(parameterName) {
+      queryParameters[parameterName] = parameters.$queryParameters[parameterName]
+    })
+  }
+  let keys = Object.keys(queryParameters)
+  return domain + path + (keys.length > 0 ? '?' + (keys.map(key => key + '=' + encodeURIComponent(queryParameters[key])).join('&')) : '')
+}
+/**
+ * 指定したIDのクラスタ情報を削除する
+ * request: ApiV1AdminClusterByIdDelete
+ * url: ApiV1AdminClusterByIdDeleteURL
+ * method: ApiV1AdminClusterByIdDelete_TYPE
+ * raw_url: ApiV1AdminClusterByIdDelete_RAW_URL
+ * @param id - 削除対象のクラスタID
+ */
+export const ApiV1AdminClusterByIdDelete = function(parameters = {}) {
+  const domain = parameters.$domain ? parameters.$domain : getDomain()
+  const config = parameters.$config
+  let path = '/api/v1/admin/cluster/{id}'
+  let body
+  let queryParameters = {}
+  let form = {}
+  path = path.replace('{id}', `${parameters['id']}`)
+  if (parameters['id'] === undefined) {
+    return Promise.reject(new Error('Missing required  parameter: id'))
+  }
+  if (parameters.$queryParameters) {
+    Object.keys(parameters.$queryParameters).forEach(function(parameterName) {
+      queryParameters[parameterName] = parameters.$queryParameters[parameterName]
+    });
+  }
+  return request('delete', domain + path, body, queryParameters, form, config)
+}
+export const ApiV1AdminClusterByIdDelete_RAW_URL = function() {
+  return '/api/v1/admin/cluster/{id}'
+}
+export const ApiV1AdminClusterByIdDelete_TYPE = function() {
+  return 'delete'
+}
+export const ApiV1AdminClusterByIdDeleteURL = function(parameters = {}) {
+  let queryParameters = {}
+  const domain = parameters.$domain ? parameters.$domain : getDomain()
+  let path = '/api/v1/admin/cluster/{id}'
+  path = path.replace('{id}', `${parameters['id']}`)
+  if (parameters.$queryParameters) {
+    Object.keys(parameters.$queryParameters).forEach(function(parameterName) {
+      queryParameters[parameterName] = parameters.$queryParameters[parameterName]
+    })
+  }
+  let keys = Object.keys(queryParameters)
+  return domain + path + (keys.length > 0 ? '?' + (keys.map(key => key + '=' + encodeURIComponent(queryParameters[key])).join('&')) : '')
+}
+/**
+ * 接続中のテナントに有効なクラスタの一覧を取得する。
+ * request: ApiV1ClusterGet
+ * url: ApiV1ClusterGetURL
+ * method: ApiV1ClusterGet_TYPE
+ * raw_url: ApiV1ClusterGet_RAW_URL
+ */
+export const ApiV1ClusterGet = function(parameters = {}) {
+  const domain = parameters.$domain ? parameters.$domain : getDomain()
+  const config = parameters.$config
+  let path = '/api/v1/cluster'
+  let body
+  let queryParameters = {}
+  let form = {}
+  if (parameters.$queryParameters) {
+    Object.keys(parameters.$queryParameters).forEach(function(parameterName) {
+      queryParameters[parameterName] = parameters.$queryParameters[parameterName]
+    });
+  }
+  return request('get', domain + path, body, queryParameters, form, config)
+}
+export const ApiV1ClusterGet_RAW_URL = function() {
+  return '/api/v1/cluster'
+}
+export const ApiV1ClusterGet_TYPE = function() {
+  return 'get'
+}
+export const ApiV1ClusterGetURL = function(parameters = {}) {
+  let queryParameters = {}
+  const domain = parameters.$domain ? parameters.$domain : getDomain()
+  let path = '/api/v1/cluster'
+  if (parameters.$queryParameters) {
+    Object.keys(parameters.$queryParameters).forEach(function(parameterName) {
+      queryParameters[parameterName] = parameters.$queryParameters[parameterName]
+    })
+  }
+  let keys = Object.keys(queryParameters)
+  return domain + path + (keys.length > 0 ? '?' + (keys.map(key => key + '=' + encodeURIComponent(queryParameters[key])).join('&')) : '')
+}
+/**
  * 接続中のテナントに有効なパーティションの一覧を取得する。
  * request: ApiV1TenantPartitionsGet
  * url: ApiV1TenantPartitionsGetURL
@@ -641,7 +901,7 @@ export const ApiV1AdminQuotasGetURL = function(parameters = {}) {
  * url: ApiV1AdminQuotasPostURL
  * method: ApiV1AdminQuotasPost_TYPE
  * raw_url: ApiV1AdminQuotasPost_RAW_URL
- * @param models - 
+ * @param models - クォータ更新用モデル
  */
 export const ApiV1AdminQuotasPost = function(parameters = {}) {
   const domain = parameters.$domain ? parameters.$domain : getDomain()

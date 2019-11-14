@@ -43,7 +43,7 @@ namespace Nssol.Platypus.Controllers.spa
         #region クラスタ管理
 
         /// <summary>
-        /// 全クラスタ一覧を取得
+        /// 全クラスタ一覧を取得する
         /// </summary>
         [HttpGet("/api/v1/admin/cluster")]
         [PermissionFilter(MenuCode.Cluster)]
@@ -56,7 +56,7 @@ namespace Nssol.Platypus.Controllers.spa
         }
 
         /// <summary>
-        /// 指定されたIDのクラスタ情報を取得。
+        /// 指定したIDのクラスタ情報を取得する
         /// </summary>
         /// <param name="id">取得対象のクラスタID</param>
         [HttpGet("/api/v1/admin/cluster/{id}")]
@@ -134,7 +134,7 @@ namespace Nssol.Platypus.Controllers.spa
         }
 
         /// <summary>
-        /// クラスタ情報の編集
+        /// 指定したIDのクラスタ情報を編集する
         /// </summary>
         /// <param name="id">編集対象のクラスタID</param>
         /// <param name="model">編集するクラスタ情報</param>
@@ -185,7 +185,7 @@ namespace Nssol.Platypus.Controllers.spa
         }
 
         /// <summary>
-        /// クラスタを削除する。
+        /// 指定したIDのクラスタ情報を削除する
         /// </summary>
         /// <param name="id">削除対象のクラスタID</param>
         [HttpDelete("/api/v1/admin/cluster/{id}")]

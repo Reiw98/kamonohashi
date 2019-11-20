@@ -21,11 +21,19 @@ using System.Threading.Tasks;
 
 namespace Nssol.Platypus.Logic
 {
+    /// <summary>
+    /// コンテナ管理サービスの管理ロジッククラス
+    /// </summary>
+    /// <remarks>
+    /// コンテナ管理とリソース管理でクラスは分けない。
+    /// 基本的には同じサービスを使う（違っても入り混じる）想定のため、参照する際にどっちのクラスを見ればいいか迷うくらいなら、まとめてしまう。
+    /// </remarks>
     public class ClusterManagementLogic : PlatypusLogicBase, IClusterManagementLogic
     {
         // for DI
         private readonly IUserRepository userRepository;
         private readonly INodeRepository nodeRepository;
+        private readonly IClusterRepository clusterRepository;
         private readonly ITensorBoardContainerRepository tensorBoardContainerRepository;
         private readonly IUnitOfWork unitOfWork;
         private readonly ILoginLogic loginLogic;
@@ -43,6 +51,7 @@ namespace Nssol.Platypus.Logic
             ICommonDiLogic commonDiLogic,
             IUserRepository userRepository,
             INodeRepository nodeRepository,
+            IClusterRepository clusterRepository,
             ITensorBoardContainerRepository tensorBoardContainerRepository,
             IClusterManagementService clusterManagementService,
             IUnitOfWork unitOfWork,
@@ -57,6 +66,7 @@ namespace Nssol.Platypus.Logic
             this.tensorBoardContainerRepository = tensorBoardContainerRepository;
             this.userRepository = userRepository;
             this.nodeRepository = nodeRepository;
+            this.clusterRepository = clusterRepository;
             this.clusterManagementService = clusterManagementService;
             this.loginLogic = loginLogic;
             this.gitLogic = gitLogic;
@@ -72,45 +82,88 @@ namespace Nssol.Platypus.Logic
         /// <summary>
         /// クラスタ管理サービスにアクセスするための認証トークンを取得する
         /// </summary>
-        private async Task<string> GetTokenAsync(bool force)
+        /// <param name="cluster">オンプレ環境以外のクラスタ情報（オンプレの場合はnull）</param>
+        /// <param name="force">Admin権限で実行するかどうか</param>
+        /// <remarks>
+        /// クラスタ情報が存在する場合はその情報を使用する。
+        /// それ以外の場合はオンプレ環境用の情報を使用する。
+        /// </remarks>
+        private async Task<string> GetTokenAsync(Cluster cluster, bool force)
         {
+            // クラスタが指定されている場合、クラスタのトークンを使用する
+            if (cluster != null)
+            {
+                return cluster.ResourceManageKey;
+            }
+            // Admin権限で実行するため、共通トークンを使用する
             if (force)
             {
                 return containerOptions.ResourceManageKey;
             }
             else
             {
-                return await GetUserAccessTokenAsync();
+                return await GetUserAccessTokenAsync(null);
+            }
+        }
+
+        /// <summary>
+        /// クラスタ管理サービスのBaseUrlを取得する
+        /// </summary>
+        /// <param name="cluster">オンプレ環境以外のクラスタ情報（オンプレの場合はnull）</param>
+        /// <remarks>
+        /// クラスタ情報が存在する場合はその情報を使用する。
+        /// それ以外の場合はオンプレ環境用の情報を使用する。
+        /// </remarks>
+        private string GetContainerServiceBaseUrl(Cluster cluster)
+        {
+            // クラスタが指定されている場合、クラスタのURLを使用する
+            if (cluster != null)
+            {
+                return cluster.ServiceBaseUrl;
+            }
+            else
+            {
+                return containerOptions.ContainerServiceBaseUrl;
             }
         }
 
         /// <summary>
         /// 全コンテナの情報を取得する
         /// </summary>
-        public async Task<Result<IEnumerable<ContainerDetailsInfo>, ContainerStatus>> GetAllContainerDetailsInfosAsync()
+        /// <param name="cluster">オンプレ環境以外のクラスタ情報（オンプレの場合はnull）</param>
+        public async Task<Result<IEnumerable<ContainerDetailsInfo>, ContainerStatus>> GetAllContainerDetailsInfosAsync(Cluster cluster)
         {
-            string token = await GetTokenAsync(true);
-            var result = await clusterManagementService.GetAllContainerDetailsInfosAsync(token);
+            string token = await GetTokenAsync(cluster, true);
+            string containerServiceBaseUrl = GetContainerServiceBaseUrl(cluster);
+            var result = await clusterManagementService.GetAllContainerDetailsInfosAsync(containerServiceBaseUrl, token);
             return result;
         }
 
         /// <summary>
         /// 特定のテナントに紐づいた全コンテナの情報を取得する
         /// </summary>
-        public async Task<Result<IEnumerable<ContainerDetailsInfo>, ContainerStatus>> GetAllContainerDetailsInfosAsync(string tenantName)
+        /// <param name="tenantName">テナント名</param>
+        /// <param name="cluster">オンプレ環境以外のクラスタ情報（オンプレの場合はnull）</param>
+        public async Task<Result<IEnumerable<ContainerDetailsInfo>, ContainerStatus>> GetAllContainerDetailsInfosAsync(string tenantName, Cluster cluster)
         {
             //トークンは管理者ではなくユーザの物を使用する
-            string token = await GetTokenAsync(false);
-            var result = await clusterManagementService.GetAllContainerDetailsInfosAsync(token, tenantName);
+            string token = await GetTokenAsync(cluster, false);
+            string containerServiceBaseUrl = GetContainerServiceBaseUrl(cluster);
+            var result = await clusterManagementService.GetAllContainerDetailsInfosAsync(containerServiceBaseUrl, token, tenantName);
             return result;
         }
 
         /// <summary>
         /// 指定したコンテナのエンドポイント付きの情報をクラスタ管理サービスに問い合わせる。
         /// </summary>
-        public async Task<ContainerEndpointInfo> GetContainerEndpointInfoAsync(string containerName, string tenantName, bool force)
+        /// <param name="containerName">コンテナ名</param>
+        /// <param name="tenantName">テナント名</param>
+        /// <param name="cluster">オンプレ環境以外のクラスタ情報（オンプレの場合はnull）</param>
+        /// <param name="force">Admin権限で実行するか</param>
+        public async Task<ContainerEndpointInfo> GetContainerEndpointInfoAsync(string containerName, string tenantName, Cluster cluster, bool force)
         {
-            string token = await GetTokenAsync(force);
+            string containerServiceBaseUrl = GetContainerServiceBaseUrl(cluster);
+            string token = await GetTokenAsync(cluster, force);
             if (token == null)
             {
                 //トークンがない場合、エラー状態を返す
@@ -121,16 +174,21 @@ namespace Nssol.Platypus.Logic
                 };
             }
 
-            var result = await clusterManagementService.GetContainerEndpointInfoAsync(containerName, tenantName, token);
+            var result = await clusterManagementService.GetContainerEndpointInfoAsync(containerName, tenantName, containerServiceBaseUrl, token);
             return result;
         }
 
         /// <summary>
         /// 指定したコンテナの詳細情報をクラスタ管理サービスに問い合わせる。
         /// </summary>
-        public async Task<ContainerDetailsInfo> GetContainerDetailsInfoAsync(string containerName, string tenantName, bool force)
+        /// <param name="containerName">コンテナ名</param>
+        /// <param name="tenantName">テナント名</param>
+        /// <param name="cluster">オンプレ環境以外のクラスタ情報（オンプレの場合はnull）</param>
+        /// <param name="force">Admin権限で実行するか</param>
+        public async Task<ContainerDetailsInfo> GetContainerDetailsInfoAsync(string containerName, string tenantName, Cluster cluster, bool force)
         {
-            string token = await GetTokenAsync(force);
+            string containerServiceBaseUrl = GetContainerServiceBaseUrl(cluster);
+            string token = await GetTokenAsync(cluster, force);
             if (token == null)
             {
                 //トークンがない場合、エラー状態を返す
@@ -141,23 +199,28 @@ namespace Nssol.Platypus.Logic
                 };
             }
 
-            var result = await clusterManagementService.GetContainerDetailsInfoAsync(containerName, tenantName, token);
+            var result = await clusterManagementService.GetContainerDetailsInfoAsync(containerName, tenantName, containerServiceBaseUrl, token);
             return result;
         }
 
         /// <summary>
         /// 指定したコンテナのステータスをクラスタ管理サービスに問い合わせる。
         /// </summary>
-        public async Task<ContainerStatus> GetContainerStatusAsync(string containerName, string tenantName, bool force)
+        /// <param name="containerName">コンテナ名</param>
+        /// <param name="tenantName">テナント名</param>
+        /// <param name="cluster">オンプレ環境以外のクラスタ情報（オンプレの場合はnull）</param>
+        /// <param name="force">Admin権限で実行するか</param>
+        public async Task<ContainerStatus> GetContainerStatusAsync(string containerName, string tenantName, Cluster cluster, bool force)
         {
-            string token = await GetTokenAsync(force);
+            string containerServiceBaseUrl = GetContainerServiceBaseUrl(cluster);
+            string token = await GetTokenAsync(cluster, force);
             if (token == null)
             {
                 //トークンがない場合、エラー状態を返す
                 return ContainerStatus.Failed;
             }
 
-            var result = await clusterManagementService.GetContainerStatusAsync(containerName, tenantName, token);
+            var result = await clusterManagementService.GetContainerStatusAsync(containerName, tenantName, containerServiceBaseUrl, token);
             return result;
         }
 
@@ -165,9 +228,15 @@ namespace Nssol.Platypus.Logic
         /// 指定したコンテナを削除する。
         /// 対象コンテナが存在しない場合はエラーになる。
         /// </summary>
-        public async Task<bool> DeleteContainerAsync(ContainerType type, string containerName, string tenantName, bool force)
+        /// <param name="type">コンテナ種別</param>
+        /// <param name="containerName">コンテナ名</param>
+        /// <param name="tenantName">テナント名</param>
+        /// <param name="cluster">オンプレ環境以外のクラスタ情報（オンプレの場合はnull）</param>
+        /// <param name="force">Admin権限で実行するか</param>
+        public async Task<bool> DeleteContainerAsync(ContainerType type, string containerName, string tenantName, Cluster cluster, bool force)
         {
-            string token = await GetTokenAsync(force);
+            string containerServiceBaseUrl = GetContainerServiceBaseUrl(cluster);
+            string token = await GetTokenAsync(cluster, force);
             if (token == null)
             {
                 //トークンがない場合、エラー
@@ -175,16 +244,21 @@ namespace Nssol.Platypus.Logic
             }
 
             //コンテナサービスに削除を依頼
-            return await clusterManagementService.DeleteContainerAsync(type, containerName, tenantName, token);
+            return await clusterManagementService.DeleteContainerAsync(type, containerName, tenantName, containerServiceBaseUrl, token);
         }
 
         /// <summary>
         /// 指定したコンテナのログを取得する。
         /// 失敗した場合はコンテナのステータスを返す。
         /// </summary>
-        public async Task<Result<System.IO.Stream, ContainerStatus>> DownloadLogAsync(string containerName, string tenantName, bool force)
+        /// <param name="containerName">コンテナ名</param>
+        /// <param name="tenantName">テナント名</param>
+        /// <param name="cluster">オンプレ環境以外のクラスタ情報（オンプレの場合はnull）</param>
+        /// <param name="force">Admin権限で実行するか</param>
+        public async Task<Result<System.IO.Stream, ContainerStatus>> DownloadLogAsync(string containerName, string tenantName, Cluster cluster, bool force)
         {
-            string token = await GetTokenAsync(force);
+            string containerServiceBaseUrl = GetContainerServiceBaseUrl(cluster);
+            string token = await GetTokenAsync(cluster, force);
             if (token == null)
             {
                 //トークンがない場合、エラー
@@ -192,31 +266,40 @@ namespace Nssol.Platypus.Logic
             }
 
             //対象コンテナが稼働中なので、ログを取得する
-            var logfileStream = await clusterManagementService.DownloadLogAsync(containerName, tenantName, token);
+            var logfileStream = await clusterManagementService.DownloadLogAsync(containerName, tenantName, containerServiceBaseUrl, token);
             return logfileStream;
         }
 
         /// <summary>
         /// 指定したテナントのイベントを取得する
         /// </summary>
-        public async Task<Result<IEnumerable<ContainerEventInfo>, ContainerStatus>> GetEventsAsync(Tenant tenant, bool force)
+        /// <param name="tenant">テナント情報</param>
+        /// <param name="cluster">オンプレ環境以外のクラスタ情報（オンプレの場合はnull）</param>
+        /// <param name="force">Admin権限で実行するか</param>
+        public async Task<Result<IEnumerable<ContainerEventInfo>, ContainerStatus>> GetEventsAsync(Tenant tenant, Cluster cluster, bool force)
         {
-            string token = await GetTokenAsync(force);
+            string containerServiceBaseUrl = GetContainerServiceBaseUrl(cluster);
+            string token = await GetTokenAsync(cluster, force);
             if (token == null)
             {
                 //トークンがない場合、エラー
                 return Result<IEnumerable<ContainerEventInfo>, ContainerStatus>.CreateErrorResult(ContainerStatus.Forbidden);
             }
 
-            return await clusterManagementService.GetEventsAsync(tenant, token);
+            return await clusterManagementService.GetEventsAsync(tenant, containerServiceBaseUrl, token);
         }
-        
+
         /// <summary>
         /// 指定したコンテナのイベントを取得する
         /// </summary>
-        public async Task<Result<IEnumerable<ContainerEventInfo>, ContainerStatus>> GetEventsAsync(Tenant tenant, string containerName, bool force, bool errorOnly)
+        /// <param name="tenant">テナント情報</param>
+        /// <param name="containerName">コンテナ名</param>
+        /// <param name="cluster">オンプレ環境以外のクラスタ情報（オンプレの場合はnull）</param>
+        /// <param name="force">Admin権限で実行するか</param>
+        /// <param name="errorOnly">エラー情報だけか否か</param>
+        public async Task<Result<IEnumerable<ContainerEventInfo>, ContainerStatus>> GetEventsAsync(Tenant tenant, string containerName, Cluster cluster, bool force, bool errorOnly)
         {
-            var result = await GetEventsAsync(tenant, force);
+            var result = await GetEventsAsync(tenant, cluster, force);
 
             if(result.IsSuccess)
             {
@@ -238,7 +321,7 @@ namespace Nssol.Platypus.Logic
         /// <returns>作成したコンテナのステータス</returns>
         public async Task<Result<ContainerInfo, string>> RunPreprocessingContainerAsync(PreprocessHistory preprocessHistory)
         {
-            string token = await GetUserAccessTokenAsync();
+            string token = await GetUserAccessTokenAsync(null);
             if (token == null)
             {
                 //トークンがない場合、結果はnull
@@ -311,6 +394,7 @@ namespace Nssol.Platypus.Logic
                 },
                 EntryPoint = preprocessHistory.Preprocess.EntryPoint,
 
+                ClusterManagerServiceBaseUrl = containerOptions.ContainerServiceBaseUrl,
                 ClusterManagerToken = token,
                 RegistryTokenName = registryMap.RegistryTokenKey,
                 IsNodePort = true
@@ -385,13 +469,6 @@ namespace Nssol.Platypus.Logic
         /// <returns>作成したコンテナのステータス</returns>
         public async Task<Result<ContainerInfo, string>> RunTrainContainerAsync(TrainingHistory trainHistory)
         {
-            string token = await GetUserAccessTokenAsync();
-            if (token == null)
-            {
-                //トークンがない場合、結果はnull
-                return Result<ContainerInfo, string>.CreateErrorResult("Access denied. Failed to get token to access the cluster management system.");
-            }
-
             long gitId = trainHistory.ModelGitId == -1 ?
                 CurrentUserInfo.SelectedTenant.DefaultGitId.Value : trainHistory.ModelGitId;
 
@@ -402,13 +479,6 @@ namespace Nssol.Platypus.Logic
             {
                 //Git情報は必須にしているので、無ければエラー
                 return Result<ContainerInfo, string>.CreateErrorResult("Git credential is not valid.");
-            }
-
-            var nodes = GetAccessibleNode();
-            if (nodes == null || nodes.Count == 0)
-            {
-                //デプロイ可能なノードがゼロなら、エラー扱い
-                return Result<ContainerInfo, string>.CreateErrorResult("Access denied.　There is no node this tenant can use.");
             }
 
             //コンテナを起動するために必要な設定値をインスタンス化
@@ -481,7 +551,6 @@ namespace Nssol.Platypus.Logic
                 },
                 EntryPoint = trainHistory.EntryPoint,
 
-                ClusterManagerToken = token,
                 RegistryTokenName = registryMap.RegistryTokenKey,
                 IsNodePort = true
             };
@@ -502,16 +571,61 @@ namespace Nssol.Platypus.Logic
             // ユーザの任意追加環境変数をマージする
             AddUserEnvToInputModel(trainHistory.OptionDic, inputModel);
 
-            //使用できるノードを制約に追加
-            inputModel.ConstraintList = new Dictionary<string, List<string>>()
+            // クラスタIDの設定有無で、コンテナ管理情報を分ける
+            if (!trainHistory.ClusterId.HasValue)
             {
-                { containerOptions.ContainerLabelHostName, nodes }
-            };
+                // クラスタIDがnullの場合、使用可能なノードがあるかチェックする
+                var nodes = GetAccessibleNode();
+                if (nodes == null || nodes.Count == 0)
+                {
+                    //デプロイ可能なノードがゼロなら、エラー扱い
+                    return Result<ContainerInfo, string>.CreateErrorResult("Access denied.　There is no node this tenant can use.");
+                }
 
-            if (string.IsNullOrEmpty(trainHistory.Partition) == false)
+                //使用できるノードを制約に追加
+                inputModel.ConstraintList = new Dictionary<string, List<string>>()
+                {
+                    { containerOptions.ContainerLabelHostName, nodes }
+                };
+
+                if (string.IsNullOrEmpty(trainHistory.Partition) == false)
+                {
+                    // パーティション指定があれば追加
+                    inputModel.ConstraintList.Add(containerOptions.ContainerLabelPartition, new List<string> { trainHistory.Partition });
+                }
+
+                // クラスタ管理サービス接続URLを設定
+                inputModel.ClusterManagerServiceBaseUrl = containerOptions.ContainerServiceBaseUrl;
+
+                // クラスタ管理サービス接続トークンを取得・設定
+                string token = await GetUserAccessTokenAsync(null);
+                if (token == null)
+                {
+                    //トークンがない場合、結果はnull
+                    return Result<ContainerInfo, string>.CreateErrorResult("Access denied. Failed to get token to access the cluster management system.");
+                }
+                inputModel.ClusterManagerToken = token;
+            }
+            else
             {
-                // パーティション指定があれば追加
-                inputModel.ConstraintList.Add(containerOptions.ContainerLabelPartition, new List<string> { trainHistory.Partition });
+                // クラスタIDがnullでない場合、指定したクラスタIDが使用可能なクラスタかチェックする
+                var cluster = GetAccessibleCluster(trainHistory.ClusterId.Value);
+                if (cluster == null)
+                {
+                    //デプロイ可能なクラスタがゼロなら、エラー扱い
+                    return Result<ContainerInfo, string>.CreateErrorResult("Access denied.　There is no cluster this tenant can use.");
+                }
+
+                // クラスタ管理サービス接続URLを設定
+                inputModel.ClusterManagerServiceBaseUrl = cluster.ServiceBaseUrl;
+                // クラスタ管理サービス接続トークンを取得・設定
+                string token = await GetUserAccessTokenAsync(cluster);
+                if (token == null)
+                {
+                    //トークンがない場合、結果はnull
+                    return Result<ContainerInfo, string>.CreateErrorResult("Access denied. Failed to get token to access the cluster management system.");
+                }
+                inputModel.ClusterManagerToken = token;
             }
 
             var outModel = await clusterManagementService.RunContainerAsync(inputModel);
@@ -535,13 +649,6 @@ namespace Nssol.Platypus.Logic
         /// <returns>作成したコンテナのステータス</returns>
         public async Task<Result<ContainerInfo, string>> RunInferenceContainerAsync(InferenceHistory inferenceHistory)
         {
-            string token = await GetUserAccessTokenAsync();
-            if (token == null)
-            {
-                //トークンがない場合、結果はnull
-                return Result<ContainerInfo, string>.CreateErrorResult("Access denied. Failed to get token to access the cluster management system.");
-            }
-
             long gitId = inferenceHistory.ModelGitId == -1 ?
                 CurrentUserInfo.SelectedTenant.DefaultGitId.Value : inferenceHistory.ModelGitId.Value;
 
@@ -553,14 +660,6 @@ namespace Nssol.Platypus.Logic
                 //Git情報は必須にしているので、無ければエラー
                 return Result<ContainerInfo, string>.CreateErrorResult("Git credential is not valid.");
             }
-
-            var nodes = GetAccessibleNode();
-            if (nodes == null || nodes.Count == 0)
-            {
-                //デプロイ可能なノードがゼロなら、エラー扱い
-                return Result<ContainerInfo, string>.CreateErrorResult("Access denied.　There is no node this tenant can use.");
-            }
-
            
             //コンテナを起動するために必要な設定値をインスタンス化
             var inputModel = new RunContainerInputModel()
@@ -632,7 +731,6 @@ namespace Nssol.Platypus.Logic
                 },
                 EntryPoint = inferenceHistory.EntryPoint,
 
-                ClusterManagerToken = token,
                 RegistryTokenName = registryMap.RegistryTokenKey,
                 IsNodePort = true
             };
@@ -654,16 +752,61 @@ namespace Nssol.Platypus.Logic
             // ユーザの任意追加環境変数をマージする
             AddUserEnvToInputModel(inferenceHistory.OptionDic, inputModel);
 
-            //使用できるノードを制約に追加
-            inputModel.ConstraintList = new Dictionary<string, List<string>>()
+            // クラスタIDの設定有無で、コンテナ管理情報を分ける
+            if (!inferenceHistory.ClusterId.HasValue)
             {
-                { containerOptions.ContainerLabelHostName, nodes }
-            };
+                // クラスタIDがnullの場合、使用可能なノードがあるかチェックする
+                var nodes = GetAccessibleNode();
+                if (nodes == null || nodes.Count == 0)
+                {
+                    //デプロイ可能なノードがゼロなら、エラー扱い
+                    return Result<ContainerInfo, string>.CreateErrorResult("Access denied.　There is no node this tenant can use.");
+                }
 
-            if (string.IsNullOrEmpty(inferenceHistory.Partition) == false)
+                //使用できるノードを制約に追加
+                inputModel.ConstraintList = new Dictionary<string, List<string>>()
+                {
+                    { containerOptions.ContainerLabelHostName, nodes }
+                };
+
+                if (string.IsNullOrEmpty(inferenceHistory.Partition) == false)
+                {
+                    // パーティション指定があれば追加
+                    inputModel.ConstraintList.Add(containerOptions.ContainerLabelPartition, new List<string> { inferenceHistory.Partition });
+                }
+
+                // クラスタ管理サービス接続URLを設定
+                inputModel.ClusterManagerServiceBaseUrl = containerOptions.ContainerServiceBaseUrl;
+
+                // クラスタ管理サービス接続トークンを取得・設定
+                string token = await GetUserAccessTokenAsync(null);
+                if (token == null)
+                {
+                    //トークンがない場合、結果はnull
+                    return Result<ContainerInfo, string>.CreateErrorResult("Access denied. Failed to get token to access the cluster management system.");
+                }
+                inputModel.ClusterManagerToken = token;
+            }
+            else
             {
-                // パーティション指定があれば追加
-                inputModel.ConstraintList.Add(containerOptions.ContainerLabelPartition, new List<string> { inferenceHistory.Partition });
+                // クラスタIDがnullでない場合、指定したクラスタIDが使用可能なクラスタかチェックする
+                var cluster = GetAccessibleCluster(inferenceHistory.ClusterId.Value);
+                if (cluster == null)
+                {
+                    //デプロイ可能なクラスタがゼロなら、エラー扱い
+                    return Result<ContainerInfo, string>.CreateErrorResult("Access denied.　There is no cluster this tenant can use.");
+                }
+
+                // クラスタ管理サービス接続URLを設定
+                inputModel.ClusterManagerServiceBaseUrl = cluster.ServiceBaseUrl;
+                // クラスタ管理サービス接続トークンを取得・設定
+                string token = await GetUserAccessTokenAsync(cluster);
+                if (token == null)
+                {
+                    //トークンがない場合、結果はnull
+                    return Result<ContainerInfo, string>.CreateErrorResult("Access denied. Failed to get token to access the cluster management system.");
+                }
+                inputModel.ClusterManagerToken = token;
             }
 
             var outModel = await clusterManagementService.RunContainerAsync(inputModel);
@@ -696,7 +839,7 @@ namespace Nssol.Platypus.Logic
             string tenantId = CurrentUserInfo.SelectedTenant.Id.ToString("0000");
             string containerName = $"tensorboard-{tenantId}-{trainingHistory.Id}-{DateTime.Now.ToString("yyyyMMddHHmmssffffff")}";
 
-            string token = await GetUserAccessTokenAsync();
+            string token = await GetUserAccessTokenAsync(null);
             if(token == null)
             {
                 //トークンがない場合、結果はnull
@@ -757,6 +900,7 @@ namespace Nssol.Platypus.Logic
                 {
                     new PortMappingModel() { Protocol = "TCP", Port = 6006, TargetPort = 6006, Name = "tensorboard" }
                 },
+                ClusterManagerServiceBaseUrl = containerOptions.ContainerServiceBaseUrl,
                 ClusterManagerToken = token,
                 IsNodePort = true //ランダムポート指定。アクセス先ポートが動的に決まるようになる。
             };
@@ -793,7 +937,7 @@ namespace Nssol.Platypus.Logic
             {
                 //ホストが決まっていない＝リソースに空きがなくて、待っている状態
 
-                var info = await GetContainerEndpointInfoAsync(container.Name, CurrentUserInfo.SelectedTenant.Name, false);
+                var info = await GetContainerEndpointInfoAsync(container.Name, CurrentUserInfo.SelectedTenant.Name, null, false);
                 result = info.Status;
                 var endpoint = info.EndPoints?.FirstOrDefault(e => e.Key == "tensorboard");
                 if (endpoint != null)
@@ -813,7 +957,7 @@ namespace Nssol.Platypus.Logic
             }
             else
             {
-                result = await GetContainerStatusAsync(container.Name, container.Tenant.Name, force);
+                result = await GetContainerStatusAsync(container.Name, container.Tenant.Name, null, force);
             }
 
             
@@ -847,24 +991,10 @@ namespace Nssol.Platypus.Logic
         /// <returns>作成したコンテナのステータス</returns>
         public async Task<Result<ContainerInfo, string>> RunNotebookContainerAsync(NotebookHistory notebookHistory)
         {
-            string token = await GetUserAccessTokenAsync();
-            if (token == null)
-            {
-                //トークンがない場合、結果はnull
-                return Result<ContainerInfo, string>.CreateErrorResult("Access denied. Failed to get token to access the cluster management system.");
-            }
-
             var registryMap = new UserTenantRegistryMap();
             if (notebookHistory.ContainerRegistryId.HasValue)
             {
                 registryMap = registryLogic.GetCurrentRegistryMap(notebookHistory.ContainerRegistryId.Value);
-            }
-
-            var nodes = GetAccessibleNode();
-            if (nodes == null || nodes.Count == 0)
-            {
-                //デプロイ可能なノードがゼロなら、エラー扱い
-                return Result<ContainerInfo, string>.CreateErrorResult("Access denied.　There is no node this tenant can use.");
             }
 
             //コンテナを起動するために必要な設定値をインスタンス化
@@ -933,7 +1063,6 @@ namespace Nssol.Platypus.Logic
                 {
                     new PortMappingModel() { Protocol = "TCP", Port = 8888, TargetPort = 8888, Name = "notebook" },
                 },
-                ClusterManagerToken = token,
                 RegistryTokenName = notebookHistory.ContainerRegistryId.HasValue ? registryMap.RegistryTokenKey : null,
                 IsNodePort = true
             };
@@ -965,17 +1094,62 @@ namespace Nssol.Platypus.Logic
                 AddUserEnvToInputModel(notebookHistory.OptionDic, inputModel);
             }
 
-            //使用できるノードを制約に追加
-            inputModel.ConstraintList = new Dictionary<string, List<string>>()
+            // クラスタIDの設定有無で、コンテナ管理情報を分ける
+            if (!notebookHistory.ClusterId.HasValue)
             {
-                { containerOptions.ContainerLabelHostName, nodes },
-                { containerOptions.ContainerLabelNotebookEnabled, new List<string> { "true" } } // notebookの実行が許可されているサーバでのみ実行
-            };
+                // クラスタIDがnullの場合、使用可能なノードがあるかチェックする
+                var nodes = GetAccessibleNode();
+                if (nodes == null || nodes.Count == 0)
+                {
+                    //デプロイ可能なノードがゼロなら、エラー扱い
+                    return Result<ContainerInfo, string>.CreateErrorResult("Access denied.　There is no node this tenant can use.");
+                }
 
-            if (string.IsNullOrEmpty(notebookHistory.Partition) == false)
+                //使用できるノードを制約に追加
+                inputModel.ConstraintList = new Dictionary<string, List<string>>()
+                {
+                    { containerOptions.ContainerLabelHostName, nodes },
+                    { containerOptions.ContainerLabelNotebookEnabled, new List<string> { "true" } } // notebookの実行が許可されているサーバでのみ実行
+                };
+
+                if (string.IsNullOrEmpty(notebookHistory.Partition) == false)
+                {
+                    // パーティション指定があれば追加
+                    inputModel.ConstraintList.Add(containerOptions.ContainerLabelPartition, new List<string> { notebookHistory.Partition });
+                }
+
+                // クラスタ管理サービス接続URLを設定
+                inputModel.ClusterManagerServiceBaseUrl = containerOptions.ContainerServiceBaseUrl;
+
+                // クラスタ管理サービス接続トークンを取得・設定
+                string token = await GetUserAccessTokenAsync(null);
+                if (token == null)
+                {
+                    //トークンがない場合、結果はnull
+                    return Result<ContainerInfo, string>.CreateErrorResult("Access denied. Failed to get token to access the cluster management system.");
+                }
+                inputModel.ClusterManagerToken = token;
+            }
+            else
             {
-                // パーティション指定があれば追加
-                inputModel.ConstraintList.Add(containerOptions.ContainerLabelPartition, new List<string> { notebookHistory.Partition });
+                // クラスタIDがnullでない場合、指定したクラスタIDが使用可能なクラスタかチェックする
+                var cluster = GetAccessibleCluster(notebookHistory.ClusterId.Value);
+                if (cluster == null)
+                {
+                    //デプロイ可能なクラスタがゼロなら、エラー扱い
+                    return Result<ContainerInfo, string>.CreateErrorResult("Access denied.　There is no cluster this tenant can use.");
+                }
+
+                // クラスタ管理サービス接続URLを設定
+                inputModel.ClusterManagerServiceBaseUrl = cluster.ServiceBaseUrl;
+                // クラスタ管理サービス接続トークンを取得・設定
+                string token = await GetUserAccessTokenAsync(null);
+                if (token == null)
+                {
+                    //トークンがない場合、結果はnull
+                    return Result<ContainerInfo, string>.CreateErrorResult("Access denied. Failed to get token to access the cluster management system.");
+                }
+                inputModel.ClusterManagerToken = cluster.ResourceManageKey;
             }
 
             var outModel = await clusterManagementService.RunContainerAsync(inputModel);
@@ -1131,17 +1305,26 @@ namespace Nssol.Platypus.Logic
         /// 指定したテナントを作成する。
         /// 既にある場合は何もしない。
         /// </summary>
-        public async Task<bool> RegistTenantAsync(string tenantName)
+        /// <param name="tenantName">テナント名</param>
+        /// <param name="cluster">オンプレ環境以外のクラスタ情報（オンプレの場合はnull）</param>
+        public async Task<bool> RegistTenantAsync(string tenantName, Cluster cluster)
         {
-            return await clusterManagementService.RegistTenantAsync(tenantName);
+            string token = await GetTokenAsync(cluster, true);
+            string containerServiceBaseUrl = GetContainerServiceBaseUrl(cluster);
+
+            return await clusterManagementService.RegistTenantAsync(tenantName, containerServiceBaseUrl, token);
         }
 
         /// <summary>
         /// ログイン中のユーザ＆テナントに対する、クラスタ管理サービスにアクセスするためのトークンを取得する。
         /// 存在しない場合、新規に作成する。
         /// </summary>
-        public async Task<string> GetUserAccessTokenAsync()
+        /// <param name="cluster">オンプレ環境以外のクラスタ情報（オンプレの場合はnull）</param>
+        public async Task<string> GetUserAccessTokenAsync(Cluster cluster)
         {
+            string adminToken = await GetTokenAsync(cluster, true);
+            string containerServiceBaseUrl = GetContainerServiceBaseUrl(cluster);
+
             string token = userRepository.GetClusterToken(CurrentUserInfo.Id, CurrentUserInfo.SelectedTenant.Id);
 
             if (token == null)
@@ -1160,18 +1343,19 @@ namespace Nssol.Platypus.Logic
 
                     CurrentUserInfo.Alias = alias;
                 }
-                token = await clusterManagementService.RegistUserAsync(TenantName, CurrentUserInfo.Alias);
-
-                if(token == null)
-                {
-                    //トークン生成に失敗
-                    return null;
-                }
-
-                //新規トークンをDBへ登録
-                userRepository.SetClusterToken(CurrentUserInfo.Id, CurrentUserInfo.SelectedTenant.Id, token);
-                unitOfWork.Commit();
             }
+
+            token = await clusterManagementService.RegistUserAsync(TenantName, CurrentUserInfo.Alias, containerServiceBaseUrl, adminToken);
+
+            if (token == null)
+            {
+                //トークン生成に失敗
+                return null;
+            }
+
+            //新規トークンをDBへ登録
+            userRepository.SetClusterToken(CurrentUserInfo.Id, CurrentUserInfo.SelectedTenant.Id, token);
+            unitOfWork.Commit();
 
             return token;
         }
@@ -1179,9 +1363,14 @@ namespace Nssol.Platypus.Logic
         /// <summary>
         /// 指定したテナントを抹消(削除)する。
         /// </summary>
-        public async Task<bool> EraseTenantAsync(string tenantName)
+        /// <param name="tenantName">テナント名</param>
+        /// <param name="cluster">オンプレ環境以外のクラスタ情報（オンプレの場合はnull）</param>
+        public async Task<bool> EraseTenantAsync(string tenantName, Cluster cluster)
         {
-            return await clusterManagementService.EraseTenantAsync(tenantName);
+            string token = await GetTokenAsync(cluster, true);
+            string containerServiceBaseUrl = GetContainerServiceBaseUrl(cluster);
+
+            return await clusterManagementService.EraseTenantAsync(tenantName, containerServiceBaseUrl, token);
         }
 
         /// <summary>
@@ -1190,6 +1379,14 @@ namespace Nssol.Platypus.Logic
         private List<string> GetAccessibleNode()
         {
             return nodeRepository.GetAccessibleNodes(CurrentUserInfo.SelectedTenant.Id).Select(n => n.Name).ToList();
+        }
+
+        /// <summary>
+        /// 現在接続中のテナントが使用できるクラスタのうち、指定したクラスタIDのクラスタ情報を取得する
+        /// </summary>
+        private Cluster GetAccessibleCluster(long clusterId)
+        {
+            return clusterRepository.GetAccessibleClusters(CurrentUserInfo.SelectedTenant.Id).Where(c => c.Id == clusterId).FirstOrDefault();
         }
         #endregion
 
@@ -1213,7 +1410,7 @@ namespace Nssol.Platypus.Logic
 
             // KubernetesとのWebSocket接続を確立
             var kubernetesService = CommonDiLogic.DynamicDi<Services.Interfaces.IClusterManagementService>();
-            var result = await kubernetesService.ConnectWebSocketAsync(jobName, tenantName, token);
+            var result = await kubernetesService.ConnectWebSocketAsync(jobName, tenantName, null, token); // TODO:クラスタ毎に接続先が変わるのか？
 
             // 確立に失敗した場合は、ブラウザとの接続を切断
             if (result.Error != null)

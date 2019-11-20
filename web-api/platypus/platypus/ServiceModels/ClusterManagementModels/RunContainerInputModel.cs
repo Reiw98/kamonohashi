@@ -83,6 +83,11 @@ namespace Nssol.Platypus.ServiceModels.ClusterManagementModels
         public PortMappingModel[] PortMappings { get; set; }
 
         /// <summary>
+        /// コンテナ管理サービスのベースURL
+        /// </summary>
+        public string ClusterManagerServiceBaseUrl { get; set; }
+
+        /// <summary>
         /// コンテナを起動するための認証トークン
         /// </summary>
         public string ClusterManagerToken { get; set; }

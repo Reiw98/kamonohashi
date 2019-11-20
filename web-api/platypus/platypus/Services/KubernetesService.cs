@@ -10,7 +10,6 @@ using Nssol.Platypus.Models;
 using Nssol.Platypus.ServiceModels.ClusterManagementModels;
 using Nssol.Platypus.ServiceModels.KubernetesModels;
 using Nssol.Platypus.Services.Interfaces;
-using RazorLight;
 using System;
 using System.Collections.Generic;
 using System.IO;
@@ -18,7 +17,6 @@ using System.Linq;
 using System.Net;
 using System.Net.WebSockets;
 using System.Text;
-using System.Text.RegularExpressions;
 using System.Threading;
 using System.Threading.Tasks;
 
@@ -74,7 +72,7 @@ namespace Nssol.Platypus.Services
 
             // 共通スクリプト
             var commonScriptBody = await CreateCommonScriptConfigMapBodyAsync(inModel.Name, inModel.TenantName, inModel.KqiToken, inModel.ScriptType);
-            var createCommonScriptConfigMapResult = await CreateConfigMapAsync(inModel.TenantName, inModel.ClusterManagerToken, commonScriptBody);
+            var createCommonScriptConfigMapResult = await CreateConfigMapAsync(inModel.TenantName, inModel.ClusterManagerServiceBaseUrl, inModel.ClusterManagerToken, commonScriptBody);
 
             if (createCommonScriptConfigMapResult.IsSuccess == false)
             {
@@ -85,7 +83,7 @@ namespace Nssol.Platypus.Services
 
             // 個別スクリプト
             var scriptBody = await CreateScriptConfigMapBodyAsync(inModel.Name, inModel.TenantName, inModel.ScriptType, inModel.EntryPoint);
-            var createScriptConfigMapResult = await CreateConfigMapAsync(inModel.TenantName, inModel.ClusterManagerToken, scriptBody);
+            var createScriptConfigMapResult = await CreateConfigMapAsync(inModel.TenantName, inModel.ClusterManagerServiceBaseUrl, inModel.ClusterManagerToken, scriptBody);
 
             if (createScriptConfigMapResult.IsSuccess == false)
             {
@@ -102,7 +100,7 @@ namespace Nssol.Platypus.Services
             {
                 LogError("Job作成に失敗: " + createJobResult.Error);
                 //失敗したら、作ったConfigMapを消す
-                await DeleteContainerAsync(inModel.Name, inModel.TenantName, inModel.ClusterManagerToken, false, false, true);
+                await DeleteContainerAsync(inModel.Name, inModel.TenantName, inModel.ClusterManagerServiceBaseUrl, inModel.ClusterManagerToken, false, false, true);
                 return Result<RunContainerOutputModel, string>.CreateErrorResult(createJobResult.Error);
             }
             config += createJobResult.Value.Trim();
@@ -117,7 +115,7 @@ namespace Nssol.Platypus.Services
                 {
                     LogError("Service作成に失敗: " + createServiceResult.Error);
                     //作ったJobとConfigMapを消す
-                    await DeleteContainerAsync(inModel.Name, inModel.TenantName, inModel.ClusterManagerToken, false, true, true);
+                    await DeleteContainerAsync(inModel.Name, inModel.TenantName, inModel.ClusterManagerServiceBaseUrl, inModel.ClusterManagerToken, false, true, true);
                     return Result<RunContainerOutputModel, string>.CreateErrorResult(createServiceResult.Error);
                 }
                 config += Separator + createServiceResult.Value.Trim();
@@ -125,11 +123,11 @@ namespace Nssol.Platypus.Services
 
             //4.ステータスを確認する。
             //これはReadなので、configには含めない
-            var containerInfo = await GetPodForJobWithRetryAsync(inModel.Name, inModel.TenantName, inModel.ClusterManagerToken);
+            var containerInfo = await GetPodForJobWithRetryAsync(inModel.Name, inModel.TenantName, inModel.ClusterManagerServiceBaseUrl, inModel.ClusterManagerToken);
             if (containerInfo.Status.Succeed() == false)
             {
                 //必要なリソースは作れたが、明らかな異常状態なので、作ったServiceとJobとConfigMapを消す
-                await DeleteContainerAsync(inModel.Name, inModel.TenantName, inModel.ClusterManagerToken, hasService, true, true);
+                await DeleteContainerAsync(inModel.Name, inModel.TenantName, inModel.ClusterManagerServiceBaseUrl, inModel.ClusterManagerToken, hasService, true, true);
                 return Result<RunContainerOutputModel, string>.CreateErrorResult("Can not access to created container. Status: " + containerInfo.Status.Name);
             }
             result.Host = containerInfo.Host; //まだPodが立っていなければnullになる
@@ -142,7 +140,13 @@ namespace Nssol.Platypus.Services
         /// コンテナを削除する。
         /// 対象コンテナが存在しない場合はエラーになる。
         /// </summary>
-        public async Task<bool> DeleteContainerAsync(ContainerType type, string containerName, string tenantName, string token)
+        /// <param name="type">コンテナ種別</param>
+        /// <param name="containerName">コンテナ名</param>
+        /// <param name="tenantName">テナント名</param>
+        /// <param name="containerServiceBaseUrl">コンテナサービスのベースURL</param>
+        /// <param name="token">削除要求をしたユーザの認証トークン</param>
+        /// <returns>成否</returns>
+        public async Task<bool> DeleteContainerAsync(ContainerType type, string containerName, string tenantName, string containerServiceBaseUrl, string token)
         {
             //ServiceとConfigMapはない可能性があるので、要否を確認
             bool hasService = false;
@@ -166,12 +170,12 @@ namespace Nssol.Platypus.Services
                     hasConfigMap = true;
                     break;
                 default:
-                    hasConfigMap = await ExistConfigMapAsync(containerName + "-scripts", tenantName, token);
-                    hasService = (await GetServiceAsync(tenantName, containerName, token)).IsSuccess;
+                    hasConfigMap = await ExistConfigMapAsync(containerName + "-scripts", tenantName, containerServiceBaseUrl, token);
+                    hasService = (await GetServiceAsync(tenantName, containerName, containerServiceBaseUrl, token)).IsSuccess;
                     break;
             }
 
-            return await DeleteContainerAsync(containerName, tenantName, token, hasService, true, hasConfigMap);
+            return await DeleteContainerAsync(containerName, tenantName, containerServiceBaseUrl, token, hasService, true, hasConfigMap);
         }
 
         /// <summary>
@@ -180,18 +184,19 @@ namespace Nssol.Platypus.Services
         /// </summary>
         /// <param name="containerName">コンテナ名</param>
         /// <param name="tenantName">テナント名</param>
+        /// <param name="containerServiceBaseUrl">コンテナサービスのベースURL</param>
         /// <param name="token">削除要求をしたユーザの認証トークン</param>
         /// <param name="deleteService">Serviceを消すか</param>
         /// <param name="deleteJob">Jobを消すか</param>
         /// <param name="deleteConfigMap">ConfigMapを消すか</param>
         /// <returns>成否</returns>
-        private async Task<bool> DeleteContainerAsync(string containerName, string tenantName, string token, bool deleteService, bool deleteJob, bool deleteConfigMap)
+        private async Task<bool> DeleteContainerAsync(string containerName, string tenantName, string containerServiceBaseUrl, string token, bool deleteService, bool deleteJob, bool deleteConfigMap)
         {
             bool success = true;
             if (deleteService)
             {
                 //Serviceを消す
-                var deleteServiceResult = await DeleteServiceAsync(containerName, tenantName, token);
+                var deleteServiceResult = await DeleteServiceAsync(containerName, tenantName, containerServiceBaseUrl, token);
                 if (deleteServiceResult.IsSuccess == false)
                 {
                     LogError("Service削除に失敗: " + deleteServiceResult.Error);
@@ -203,7 +208,7 @@ namespace Nssol.Platypus.Services
             if (deleteJob)
             {
                 //作ったJobを消す
-                var deleteJobResult = await DeleteJobAsync(containerName, tenantName, token);
+                var deleteJobResult = await DeleteJobAsync(containerName, tenantName, containerServiceBaseUrl, token);
                 if (deleteJobResult.IsSuccess == false)
                 {
                     LogError("Job削除に失敗: " + deleteJobResult.Error);
@@ -215,13 +220,13 @@ namespace Nssol.Platypus.Services
             if (deleteConfigMap)
             {
                 //ConfigMapを消す
-                var delteConfigMapResult = await DeleteConfigMapAsync(containerName+"-common-scripts", tenantName, token);
+                var delteConfigMapResult = await DeleteConfigMapAsync(containerName+"-common-scripts", tenantName, containerServiceBaseUrl, token);
                 if (delteConfigMapResult.IsSuccess == false)
                 {
                     LogError("ConfigMap削除に失敗: " + delteConfigMapResult.Error);
                     success = false;
                 }
-                delteConfigMapResult = await DeleteConfigMapAsync(containerName+"-scripts", tenantName, token);
+                delteConfigMapResult = await DeleteConfigMapAsync(containerName+"-scripts", tenantName, containerServiceBaseUrl, token);
                 if (delteConfigMapResult.IsSuccess == false)
                 {
                     LogError("ConfigMap削除に失敗: " + delteConfigMapResult.Error);
@@ -235,10 +240,14 @@ namespace Nssol.Platypus.Services
         /// <summary>
         /// 指定したコンテナのログを取得する
         /// </summary>
-        public async Task<Result<Stream, ContainerStatus>> DownloadLogAsync(string containerName, string tenantName, string token)
+        /// <param name="containerName">コンテナ名</param>
+        /// <param name="tenantName">テナント名</param>
+        /// <param name="containerServiceBaseUrl">コンテナサービスのベースURL</param>
+        /// <param name="token">要求をしたユーザの認証トークン</param>
+        public async Task<Result<Stream, ContainerStatus>> DownloadLogAsync(string containerName, string tenantName, string containerServiceBaseUrl, string token)
         {
             //Job名ではなくPod名が分からないとログを取得できないので、まずはJobのステータス情報を取得する
-            var status = await GetPodForJobAsync(containerName, tenantName, token);
+            var status = await GetPodForJobAsync(containerName, tenantName, containerServiceBaseUrl, token);
             if (status.IsSuccess == false)
             {
                 //ステータスが稼働状態ではないので、現在のステータスを返す。
@@ -247,7 +256,7 @@ namespace Nssol.Platypus.Services
 
             var response = await SendGetRequestAndReturnStreamAsync(new RequestParam()
             {
-                BaseUrl = containerOptions.ContainerServiceBaseUrl,
+                BaseUrl = containerServiceBaseUrl,
                 ApiPath = $"api/v1/namespaces/{tenantName}/pods/{status.Value.Metadata.Name}/log",
                 Token = token,
                 QueryParams = new Dictionary<string, string>() { { "container", "main" } }
@@ -266,11 +275,14 @@ namespace Nssol.Platypus.Services
         /// 指定したテナントのイベントを取得する。
         /// 失敗した場合はnullが返る。
         /// </summary>
-        public async Task<Result<IEnumerable<ContainerEventInfo>, ContainerStatus>> GetEventsAsync(Tenant tenant, string token)
+        /// <param name="tenant">テナント情報</param>
+        /// <param name="containerServiceBaseUrl">コンテナサービスのベースURL</param>
+        /// <param name="token">要求をしたユーザの認証トークン</param>
+        public async Task<Result<IEnumerable<ContainerEventInfo>, ContainerStatus>> GetEventsAsync(Tenant tenant, string containerServiceBaseUrl, string token)
         {
             var response = await SendGetRequestAsync(new RequestParam()
             {
-                BaseUrl = containerOptions.ContainerServiceBaseUrl,
+                BaseUrl = containerServiceBaseUrl,
                 ApiPath = $"api/v1/namespaces/{tenant.Name}/events",
                 Token = token
             });
@@ -375,7 +387,7 @@ namespace Nssol.Platypus.Services
             });
             var response = await SendPostRequestAsync(new RequestParam()
             {
-                BaseUrl = containerOptions.ContainerServiceBaseUrl,
+                BaseUrl = inModel.ClusterManagerServiceBaseUrl,
                 ApiPath = $"/apis/batch/v1/namespaces/{inModel.TenantName}/jobs",
                 Token = inModel.ClusterManagerToken,
                 Body = body,
@@ -400,13 +412,17 @@ namespace Nssol.Platypus.Services
         /// Jobを削除する。
         /// 成功した場合、リクエストの内容を返す。
         /// </summary>
-        private async Task<Result<string, string>> DeleteJobAsync(string jobName, string tenantName, string token)
+        /// <param name="jobName">ジョブ名</param>
+        /// <param name="tenantName">テナント名</param>
+        /// <param name="containerServiceBaseUrl">コンテナサービスのベースURL</param>
+        /// <param name="token">削除要求をしたユーザの認証トークン</param>
+        private async Task<Result<string, string>> DeleteJobAsync(string jobName, string tenantName, string containerServiceBaseUrl, string token)
         {
             //リクエストボディの作成
             string body = await RenderEngine.CompileRenderAsync<object>("delete_job.json", null);
             var response = await SendDeleteRequestAsync(new RequestParam()
             {
-                BaseUrl = containerOptions.ContainerServiceBaseUrl,
+                BaseUrl = containerServiceBaseUrl,
                 ApiPath = $"/apis/batch/v1/namespaces/{tenantName}/jobs/{jobName}",
                 Token = token,
                 Body = body,
@@ -431,12 +447,15 @@ namespace Nssol.Platypus.Services
         /// 全コンテナ情報を取得する
         /// ※ job 以外の実行形態も収集対象にしたいので、最小単位のPod単位でカウントする
         /// </summary>
-        public async Task<Result<IEnumerable<ContainerDetailsInfo>, ContainerStatus>> GetAllContainerDetailsInfosAsync(string token, string tenantName = null)
+        /// <param name="containerServiceBaseUrl">コンテナサービスのベースURL</param>
+        /// <param name="token">要求をしたユーザの認証トークン</param>
+        /// <param name="tenantName">テナント名</param>
+        public async Task<Result<IEnumerable<ContainerDetailsInfo>, ContainerStatus>> GetAllContainerDetailsInfosAsync(string containerServiceBaseUrl, string token, string tenantName = null)
         {
             // API 呼び出し
             var response = await this.SendGetRequestAsync(new RequestParam()
             {
-                BaseUrl = containerOptions.ContainerServiceBaseUrl,
+                BaseUrl = containerServiceBaseUrl,
                 ApiPath = string.IsNullOrEmpty(tenantName) ? "/api/v1/pods" : $"/api/v1/namespaces/{tenantName}/pods",
                 Token = token
             });
@@ -461,10 +480,14 @@ namespace Nssol.Platypus.Services
         /// <summary>
         /// 指定したJobのステータスを取得する。
         /// </summary>
-        public async Task<ContainerStatus> GetContainerStatusAsync(string containerName, string tenantName, string token)
+        /// <param name="containerName">コンテナ名</param>
+        /// <param name="tenantName">テナント名</param>
+        /// <param name="containerServiceBaseUrl">コンテナサービスのベースURL</param>
+        /// <param name="token">要求をしたユーザの認証トークン</param>
+        public async Task<ContainerStatus> GetContainerStatusAsync(string containerName, string tenantName, string containerServiceBaseUrl, string token)
         {
             //Podのステータス確認
-            var result = await GetPodForJobAsync(containerName, tenantName, token);
+            var result = await GetPodForJobAsync(containerName, tenantName, containerServiceBaseUrl, token);
             if (result.IsSuccess)
             {
                 // OOM Killedの場合その内容を返却する
@@ -480,10 +503,14 @@ namespace Nssol.Platypus.Services
         /// <summary>
         /// 指定したJobの詳細情報を取得する。
         /// </summary>
-        public async Task<ContainerDetailsInfo> GetContainerDetailsInfoAsync(string jobName, string tenantName, string token)
+        /// <param name="jobName">ジョブ名</param>
+        /// <param name="tenantName">テナント名</param>
+        /// <param name="containerServiceBaseUrl">コンテナサービスのベースURL</param>
+        /// <param name="token">要求をしたユーザの認証トークン</param>
+        public async Task<ContainerDetailsInfo> GetContainerDetailsInfoAsync(string jobName, string tenantName, string containerServiceBaseUrl, string token)
         {
             //Podのステータス確認
-            var result = await GetPodForJobAsync(jobName, tenantName, token);
+            var result = await GetPodForJobAsync(jobName, tenantName, containerServiceBaseUrl, token);
             if (result.IsSuccess)
             {
                 return ConvertModel(result.Value);
@@ -548,7 +575,11 @@ namespace Nssol.Platypus.Services
         /// 指定したJobの情報をエンドポイント付きで取得する。
         /// エンドポイント情報を収集するためにAPI問い合わせを追加で行う。
         /// </summary>
-        public async Task<ContainerEndpointInfo> GetContainerEndpointInfoAsync(string containerName, string tenantName, string token)
+        /// <param name="containerName">コンテナ名</param>
+        /// <param name="tenantName">テナント名</param>
+        /// <param name="containerServiceBaseUrl">コンテナサービスのベースURL</param>
+        /// <param name="token">要求をしたユーザの認証トークン</param>
+        public async Task<ContainerEndpointInfo> GetContainerEndpointInfoAsync(string containerName, string tenantName, string containerServiceBaseUrl, string token)
         {
             var containerInfo = new ContainerEndpointInfo()
             {
@@ -556,7 +587,7 @@ namespace Nssol.Platypus.Services
             };
 
             //Podのステータス確認
-            var podResult = await GetPodForJobAsync(containerName, tenantName, token);
+            var podResult = await GetPodForJobAsync(containerName, tenantName, containerServiceBaseUrl, token);
             if (podResult.IsSuccess == false)
             {
                 containerInfo.Status = podResult.Error;
@@ -573,7 +604,7 @@ namespace Nssol.Platypus.Services
             }
 
             //Serviceを取得して、エンドポイント情報を揃える
-            var serviceResult = await GetServiceAsync(tenantName, containerName, token);
+            var serviceResult = await GetServiceAsync(tenantName, containerName, containerServiceBaseUrl, token);
             if(serviceResult.IsSuccess)
             {
                 containerInfo.EndPoints = serviceResult.Value.Spec.Ports.Select(p => new EndPointInfo()
@@ -609,7 +640,11 @@ namespace Nssol.Platypus.Services
         /// 成功した場合、PodのホストIPとステータスを返す。
         /// <see cref="ContainerInfo.Port"/> は取得しないので注意。
         /// </summary>
-        private async Task<ContainerInfo> GetPodForJobWithRetryAsync(string jobName, string tenantName, string token)
+        /// <param name="jobName">ジョブ名</param>
+        /// <param name="tenantName">テナント名</param>
+        /// <param name="containerServiceBaseUrl">コンテナサービスのベースURL</param>
+        /// <param name="token">要求をしたユーザの認証トークン</param>
+        private async Task<ContainerInfo> GetPodForJobWithRetryAsync(string jobName, string tenantName, string containerServiceBaseUrl, string token)
         {
             var containerInfo = new ContainerInfo()
             {
@@ -620,7 +655,7 @@ namespace Nssol.Platypus.Services
             for (int i = 0; i < retry; i++)
             {
                 //Podのステータス確認
-                var result = await GetPodForJobAsync(jobName, tenantName, token);
+                var result = await GetPodForJobAsync(jobName, tenantName, containerServiceBaseUrl, token);
 
                 if(result.IsSuccess)
                 {
@@ -653,12 +688,16 @@ namespace Nssol.Platypus.Services
         /// Podはk8sのコンテナ管理の最小粒度で、JobやDeploymentで起動しても、内部的にはPodが起動する。
         /// KAMONOHASHIではPodが複数含まれるコンテナは使用しないため、仕様的にはJobに複数Podが紐づきうるが、運用上は必ず一つ以下のPodが返る前提。
         /// </remarks>
-        private async Task<Result<GetPodsOutputModel.ItemModel, ContainerStatus>> GetPodForJobAsync(string jobName, string tenantName, string token)
+        /// <param name="jobName">ジョブ名</param>
+        /// <param name="tenantName">テナント名</param>
+        /// <param name="containerServiceBaseUrl">コンテナサービスのベースURL</param>
+        /// <param name="token">要求をしたユーザの認証トークン</param>
+        private async Task<Result<GetPodsOutputModel.ItemModel, ContainerStatus>> GetPodForJobAsync(string jobName, string tenantName, string containerServiceBaseUrl, string token)
         {
             // API 呼び出し
             var response = await this.SendGetRequestAsync(new RequestParam()
             {
-                BaseUrl = containerOptions.ContainerServiceBaseUrl,
+                BaseUrl = containerServiceBaseUrl,
                 ApiPath = $"/api/v1/namespaces/{tenantName}/pods",
                 Token = token,
                 QueryParams = new Dictionary<string, string>()
@@ -701,7 +740,12 @@ namespace Nssol.Platypus.Services
         /// <summary>
         /// 指定したテナントの appName に対応する Pod 名を取得する
         /// </summary>
-        public async Task<Result<string, ContainerStatus>> GetPodNameAsync(string tenantName, string appName, int limit, string token)
+        /// <param name="tenantName">テナント名</param>
+        /// <param name="appName">appName</param>
+        /// <param name="limit">limit 値</param>
+        /// <param name="containerServiceBaseUrl">コンテナサービスのベースURL</param>
+        /// <param name="token">要求をしたユーザの認証トークン</param>
+        public async Task<Result<string, ContainerStatus>> GetPodNameAsync(string tenantName, string appName, int limit, string containerServiceBaseUrl, string token)
         {
             // ログ用の url 文字列
             string url = $"GET /api/v1/namespaces/{tenantName}/pods?labelSelector=app%3D{appName}&limit={limit}";
@@ -710,7 +754,7 @@ namespace Nssol.Platypus.Services
                 // API 呼び出し
                 var response = await this.SendGetRequestAsync(new RequestParam()
                 {
-                    BaseUrl = containerOptions.ContainerServiceBaseUrl,
+                    BaseUrl = containerServiceBaseUrl,
                     ApiPath = $"/api/v1/namespaces/{tenantName}/pods",
                     Token = token,
                     QueryParams = new Dictionary<string, string>()
@@ -892,7 +936,7 @@ namespace Nssol.Platypus.Services
             });
             var response = await SendPostRequestAsync(new RequestParam()
             {
-                BaseUrl = containerOptions.ContainerServiceBaseUrl,
+                BaseUrl = inModel.ClusterManagerServiceBaseUrl,
                 ApiPath = $"/api/v1/namespaces/{inModel.TenantName}/services",
                 Token = inModel.ClusterManagerToken,
                 Body = body,
@@ -917,11 +961,15 @@ namespace Nssol.Platypus.Services
         /// <summary>
         /// Service情報を取得する。
         /// </summary>
-        private async Task<Result<CreateServiceOutputModel, string>> GetServiceAsync(string tenantName, string serviceName, string token)
+        /// <param name="tenantName">テナント名</param>
+        /// <param name="serviceName">サービス名</param>
+        /// <param name="containerServiceBaseUrl">コンテナサービスのベースURL</param>
+        /// <param name="token">要求をしたユーザの認証トークン</param>
+        private async Task<Result<CreateServiceOutputModel, string>> GetServiceAsync(string tenantName, string serviceName, string containerServiceBaseUrl, string token)
         {
             var response = await SendGetRequestAsync(new RequestParam()
             {
-                BaseUrl = containerOptions.ContainerServiceBaseUrl,
+                BaseUrl = containerServiceBaseUrl,
                 ApiPath = $"/api/v1/namespaces/{tenantName}/services/{serviceName}",
                 Token = token
             });
@@ -944,13 +992,17 @@ namespace Nssol.Platypus.Services
         /// Serivceを削除する。
         /// 成功した場合、リクエストの内容を返す。
         /// </summary>
-        private async Task<Result<string, string>> DeleteServiceAsync(string serviceName, string tenantName, string token)
+        /// <param name="serviceName">サービス名</param>
+        /// <param name="tenantName">テナント名</param>
+        /// <param name="containerServiceBaseUrl">コンテナサービスのベースURL</param>
+        /// <param name="token">要求をしたユーザの認証トークン</param>
+        private async Task<Result<string, string>> DeleteServiceAsync(string serviceName, string tenantName, string containerServiceBaseUrl, string token)
         {
             //リクエストボディの作成
             string body = await RenderEngine.CompileRenderAsync<object>("delete_job.json", null);
             var response = await SendDeleteRequestAsync(new RequestParam()
             {
-                BaseUrl = containerOptions.ContainerServiceBaseUrl,
+                BaseUrl = containerServiceBaseUrl,
                 ApiPath = $"/api/v1/namespaces/{tenantName}/services/{serviceName}",
                 Token = token,
                 Body = body,
@@ -973,11 +1025,15 @@ namespace Nssol.Platypus.Services
         /// <summary>
         /// ConfigMapが存在するか確認する。
         /// </summary>
-        private async Task<bool> ExistConfigMapAsync(string name, string tenantName, string token)
+        /// <param name="name">コンフィグマップ名</param>
+        /// <param name="tenantName">テナント名</param>
+        /// <param name="containerServiceBaseUrl">コンテナサービスのベースURL</param>
+        /// <param name="token">要求をしたユーザの認証トークン</param>
+        private async Task<bool> ExistConfigMapAsync(string name, string tenantName, string containerServiceBaseUrl, string token)
         {
             var exists = (await SendGetRequestAsync(new RequestParam()
             {
-                BaseUrl = containerOptions.ContainerServiceBaseUrl,
+                BaseUrl = containerServiceBaseUrl,
                 ApiPath = $"/api/v1/namespaces/{tenantName}/configmaps/{name}",
                 Token = token,
             }));
@@ -989,11 +1045,14 @@ namespace Nssol.Platypus.Services
         /// ConfigMapはコンテナ内のstartup.shを任意のスクリプトに置換することに利用する。
         /// 成功した場合、リクエストの内容を返す。
         /// </summary>
-        private async Task<ResponseResult> CreateConfigMapAsync(string tenantName, string token, string body)
+        /// <param name="tenantName">テナント名</param>
+        /// <param name="containerServiceBaseUrl">コンテナサービスのベースURL</param>
+        /// <param name="token">要求をしたユーザの認証トークン</param>
+        private async Task<ResponseResult> CreateConfigMapAsync(string tenantName, string containerServiceBaseUrl, string token, string body)
         {
             var response = await SendPostRequestAsync(new RequestParam()
             {
-                BaseUrl = containerOptions.ContainerServiceBaseUrl,
+                BaseUrl = containerServiceBaseUrl,
                 ApiPath = $"/api/v1/namespaces/{tenantName}/configmaps",
                 Token = token,
                 Body = body,
@@ -1045,11 +1104,15 @@ namespace Nssol.Platypus.Services
         /// <summary>
         /// ConfigMapを削除する。
         /// </summary>
-        private async Task<ResponseResult> DeleteConfigMapAsync(string name, string tenantName, string token)
+        /// <param name="name">コンフィグマップ名</param>
+        /// <param name="tenantName">テナント名</param>
+        /// <param name="containerServiceBaseUrl">コンテナサービスのベースURL</param>
+        /// <param name="token">要求をしたユーザの認証トークン</param>
+        private async Task<ResponseResult> DeleteConfigMapAsync(string name, string tenantName, string containerServiceBaseUrl, string token)
         {
             var response = await SendDeleteRequestAsync(new RequestParam()
             {
-                BaseUrl = containerOptions.ContainerServiceBaseUrl,
+                BaseUrl = containerServiceBaseUrl,
                 ApiPath = $"/api/v1/namespaces/{tenantName}/configmaps/{name}",
                 Token = token
             });
@@ -1066,30 +1129,33 @@ namespace Nssol.Platypus.Services
         /// 1. 名前空間の追加
         /// 2. ロールの追加
         /// </summary>
-        public async Task<bool> RegistTenantAsync(string tenantName)
+        /// <param name="tenantName">テナント名</param>
+        /// <param name="containerServiceBaseUrl">コンテナサービスのベースURL</param>
+        /// <param name="token">要求をしたユーザの認証トークン</param>
+        public async Task<bool> RegistTenantAsync(string tenantName, string containerServiceBaseUrl, string token)
         {
-            //Admin権限で実行するため、共通トークンを使用する
-            string token = containerOptions.ResourceManageKey;
-
             //名前空間を作成する
-            if(await CreateNameSpaceAsync(tenantName, token) == false)
+            if(await CreateNameSpaceAsync(tenantName, containerServiceBaseUrl, token) == false)
             {
                 return false;
             }
 
             //ロールを作成する
-            return await CreateRoleAsync(tenantName, token);
+            return await CreateRoleAsync(tenantName, containerServiceBaseUrl, token);
         }
 
         /// <summary>
         /// 名前空間を作成する。すでにある場合は何もしない。
         /// </summary>
-        private async Task<bool> CreateNameSpaceAsync(string tenantName, string token)
+        /// <param name="tenantName">テナント名</param>
+        /// <param name="containerServiceBaseUrl">コンテナサービスのベースURL</param>
+        /// <param name="token">要求をしたユーザの認証トークン</param>
+        private async Task<bool> CreateNameSpaceAsync(string tenantName, string containerServiceBaseUrl, string token)
         {
             //既に名前空間があるか確認
             var exists = (await SendGetRequestAsync(new RequestParam()
             {
-                BaseUrl = containerOptions.ContainerServiceBaseUrl,
+                BaseUrl = containerServiceBaseUrl,
                 ApiPath = $"/api/v1/namespaces/{tenantName}/status",
                 Token = token
             }, false)).IsSuccess;
@@ -1107,7 +1173,7 @@ namespace Nssol.Platypus.Services
             });
             var param = new RequestParam()
             {
-                BaseUrl = containerOptions.ContainerServiceBaseUrl,
+                BaseUrl = containerServiceBaseUrl,
                 ApiPath = $"/api/v1/namespaces",
                 Token = token,
                 Body = body,
@@ -1132,12 +1198,15 @@ namespace Nssol.Platypus.Services
         /// <remarks>
         /// 認可はWebアプリケーション側で行うため、k8s側には全権限を持った単一ロール（ロール名は名前空間と同一）のみを作成する。
         /// </remarks>
-        private async Task<bool> CreateRoleAsync(string tenantName, string token)
+        /// <param name="tenantName">テナント名</param>
+        /// <param name="containerServiceBaseUrl">コンテナサービスのベースURL</param>
+        /// <param name="token">要求をしたユーザの認証トークン</param>
+        private async Task<bool> CreateRoleAsync(string tenantName, string containerServiceBaseUrl, string token)
         {
             //既にロールがあるか確認
             var exists = (await SendGetRequestAsync(new RequestParam()
             {
-                BaseUrl = containerOptions.ContainerServiceBaseUrl,
+                BaseUrl = containerServiceBaseUrl,
                 ApiPath = $"/apis/rbac.authorization.k8s.io/v1/namespaces/{tenantName}/roles/{tenantName}",
                 Token = token
             }, false)).IsSuccess;
@@ -1155,7 +1224,7 @@ namespace Nssol.Platypus.Services
             });
             var param = new RequestParam()
             {
-                BaseUrl = containerOptions.ContainerServiceBaseUrl,
+                BaseUrl = containerServiceBaseUrl,
                 ApiPath = $"/apis/rbac.authorization.k8s.io/v1/namespaces/{tenantName}/roles",
                 Token = token,
                 Body = body,
@@ -1255,26 +1324,29 @@ namespace Nssol.Platypus.Services
         /// 1. ロールの削除
         /// 2. 名前空間の抹消(削除)
         /// </summary>
-        public async Task<bool> EraseTenantAsync(string tenantName)
+        /// <param name="tenantName">テナント名</param>
+        /// <param name="containerServiceBaseUrl">コンテナサービスのベースURL</param>
+        /// <param name="token">要求をしたユーザの認証トークン</param>
+        public async Task<bool> EraseTenantAsync(string tenantName, string containerServiceBaseUrl, string token)
         {
-            //Admin権限で実行するため、共通トークンを使用する
-            string token = containerOptions.ResourceManageKey;
-
             // ロールの削除
-            if (!await DeleteRoleAsync(tenantName, token))
+            if (!await DeleteRoleAsync(tenantName, containerServiceBaseUrl, token))
             {
                 return false;
             }
 
             // 名前空間の抹消(削除)
-            return await DeleteNameSpaceAsync(tenantName, token);
+            return await DeleteNameSpaceAsync(tenantName, containerServiceBaseUrl, token);
         }
         /// <summary>
         /// ロールを削除する。すでに存在しないなら何もしない。
         /// </summary>
-        private async Task<bool> DeleteRoleAsync(string tenantName, string token)
+        /// <param name="tenantName">テナント名</param>
+        /// <param name="containerServiceBaseUrl">コンテナサービスのベースURL</param>
+        /// <param name="token">要求をしたユーザの認証トークン</param>
+        private async Task<bool> DeleteRoleAsync(string tenantName, string containerServiceBaseUrl, string token)
         {
-            if (!(await ContainsRoleAsync(tenantName, token)))
+            if (!(await ContainsRoleAsync(tenantName, containerServiceBaseUrl, token)))
             {
                 LogInformation($"KubernetesService#DeleteRoleAsync(): ロール {tenantName} は既に抹消済み");
                 return true;
@@ -1284,7 +1356,7 @@ namespace Nssol.Platypus.Services
             // ロールの削除
             var param = new RequestParam()
             {
-                BaseUrl = containerOptions.ContainerServiceBaseUrl,
+                BaseUrl = containerServiceBaseUrl,
                 ApiPath = $"/apis/rbac.authorization.k8s.io/v1/namespaces/{tenantName}/roles",
                 Token = token,
                 MediaType = RequestParam.MediaTypeYaml
@@ -1299,9 +1371,12 @@ namespace Nssol.Platypus.Services
         /// <summary>
         /// 名前空間を削除する。すでに存在しないなら何もしない。
         /// </summary>
-        private async Task<bool> DeleteNameSpaceAsync(string tenantName, string token)
+        /// <param name="tenantName">テナント名</param>
+        /// <param name="containerServiceBaseUrl">コンテナサービスのベースURL</param>
+        /// <param name="token">要求をしたユーザの認証トークン</param>
+        private async Task<bool> DeleteNameSpaceAsync(string tenantName, string containerServiceBaseUrl, string token)
         {
-            if (!(await ContainsNameSpaceAsync(tenantName, token)))
+            if (!(await ContainsNameSpaceAsync(tenantName, containerServiceBaseUrl, token)))
             {
                 LogInformation($"KubernetesService#DeleteNameSpaceAsync(): 名前空間 {tenantName} は既に抹消済み");
                 return true;
@@ -1310,7 +1385,7 @@ namespace Nssol.Platypus.Services
 
             var param = new RequestParam()
             {
-                BaseUrl = containerOptions.ContainerServiceBaseUrl,
+                BaseUrl = containerServiceBaseUrl,
                 ApiPath = $"/api/v1/namespaces/{tenantName}",
                 Token = token,
                 MediaType = RequestParam.MediaTypeYaml
@@ -1325,11 +1400,14 @@ namespace Nssol.Platypus.Services
         /// <summary>
         /// ロールの存在有無を返却。
         /// </summary>
-        private async Task<bool> ContainsRoleAsync(string tenantName, string token)
+        /// <param name="tenantName">テナント名</param>
+        /// <param name="containerServiceBaseUrl">コンテナサービスのベースURL</param>
+        /// <param name="token">要求をしたユーザの認証トークン</param>
+        private async Task<bool> ContainsRoleAsync(string tenantName, string containerServiceBaseUrl, string token)
         {
             bool exists = (await SendGetRequestAsync(new RequestParam()
             {
-                BaseUrl = containerOptions.ContainerServiceBaseUrl,
+                BaseUrl = containerServiceBaseUrl,
                 ApiPath = $"/apis/rbac.authorization.k8s.io/v1/namespaces/{tenantName}/roles/{tenantName}",
                 Token = token
             })).IsSuccess;
@@ -1338,11 +1416,14 @@ namespace Nssol.Platypus.Services
         /// <summary>
         /// 名前空間の存在有無を返却。
         /// </summary>
-        private async Task<bool> ContainsNameSpaceAsync(string tenantName, string token)
+        /// <param name="tenantName">テナント名</param>
+        /// <param name="containerServiceBaseUrl">コンテナサービスのベースURL</param>
+        /// <param name="token">要求をしたユーザの認証トークン</param>
+        private async Task<bool> ContainsNameSpaceAsync(string tenantName, string containerServiceBaseUrl, string token)
         {
             bool exists = (await SendGetRequestAsync(new RequestParam()
             {
-                BaseUrl = containerOptions.ContainerServiceBaseUrl,
+                BaseUrl = containerServiceBaseUrl,
                 ApiPath = $"/api/v1/namespaces/{tenantName}/status",
                 Token = token
             })).IsSuccess;
@@ -1365,37 +1446,42 @@ namespace Nssol.Platypus.Services
         /// <remarks>
         /// 名前空間とロールは作成済みの前提。存在確認は行わない。
         /// </remarks>
-        public async Task<string> RegistUserAsync(string tenantName, string userName)
+        /// <param name="tenantName">テナント名</param>
+        /// <param name="userName">ユーザ名</param>
+        /// <param name="containerServiceBaseUrl">コンテナサービスのベースURL</param>
+        /// <param name="token">要求をしたユーザの認証トークン</param>
+        public async Task<string> RegistUserAsync(string tenantName, string userName, string containerServiceBaseUrl, string token)
         {
-            //Admin権限で実行するため、共通トークンを使用する
-            string token = containerOptions.ResourceManageKey;
-
             //サービスアカウント（＝k8s側のユーザアカウント）を作成する
-            if (await CreateServiceAccountAsync(tenantName, userName, token) == false)
+            if (await CreateServiceAccountAsync(tenantName, userName, containerServiceBaseUrl, token) == false)
             {
                 return null;
             }
 
             //ロールバインディングを行う
-            if (await BindRoleToServiceAccountAsync(tenantName, userName, token) == false)
+            if (await BindRoleToServiceAccountAsync(tenantName, userName, containerServiceBaseUrl, token) == false)
             {
                 return null;
             }
 
             //トークンを作成する
-            return await GetUserTokenAsync(tenantName, userName, token);
+            return await GetUserTokenAsync(tenantName, userName, containerServiceBaseUrl, token);
         }
 
         /// <summary>
         /// サービスアカウントが存在するか確認する。
         /// 存在する場合はその認証トークン（シークレット）を返す。
         /// </summary>
-        private async Task<ResponseResult> GetServiceAccountAsync(string tenantName, string userName, string token)
+        /// <param name="tenantName">テナント名</param>
+        /// <param name="userName">ユーザ名</param>
+        /// <param name="containerServiceBaseUrl">コンテナサービスのベースURL</param>
+        /// <param name="token">要求をしたユーザの認証トークン</param>
+        private async Task<ResponseResult> GetServiceAccountAsync(string tenantName, string userName, string containerServiceBaseUrl, string token)
         {
             //既にアカウントがあるか確認
             var exists = (await SendGetRequestAsync(new RequestParam()
             {
-                BaseUrl = containerOptions.ContainerServiceBaseUrl,
+                BaseUrl = containerServiceBaseUrl,
                 ApiPath = $"/api/v1/namespaces/{tenantName}/serviceaccounts/{userName}",
                 Token = token
             }));
@@ -1406,10 +1492,14 @@ namespace Nssol.Platypus.Services
         /// <summary>
         /// サービスアカウントを作成する。すでにある場合は何もしない。
         /// </summary>
-        private async Task<bool> CreateServiceAccountAsync(string tenantName, string userName, string token)
+        /// <param name="tenantName">テナント名</param>
+        /// <param name="userName">ユーザ名</param>
+        /// <param name="containerServiceBaseUrl">コンテナサービスのベースURL</param>
+        /// <param name="token">要求をしたユーザの認証トークン</param>
+        private async Task<bool> CreateServiceAccountAsync(string tenantName, string userName, string containerServiceBaseUrl, string token)
         {
             //既にアカウントがあるか確認
-            var exists = await GetServiceAccountAsync(tenantName, userName, token);
+            var exists = await GetServiceAccountAsync(tenantName, userName, containerServiceBaseUrl, token);
             if (exists.IsSuccess)
             {
                 LogInformation($"サービスアカウント {userName}@{tenantName} は既に作成済み");
@@ -1424,7 +1514,7 @@ namespace Nssol.Platypus.Services
             });
             var param = new RequestParam()
             {
-                BaseUrl = containerOptions.ContainerServiceBaseUrl,
+                BaseUrl = containerServiceBaseUrl,
                 ApiPath = $"/api/v1/namespaces/{tenantName}/serviceaccounts",
                 Token = token,
                 Body = body,
@@ -1446,12 +1536,16 @@ namespace Nssol.Platypus.Services
         /// <summary>
         /// 指定したサービスアカウントにロールを紐づける。
         /// </summary>
-        private async Task<bool> BindRoleToServiceAccountAsync(string tenantName, string userName, string token)
+        /// <param name="tenantName">テナント名</param>
+        /// <param name="userName">ユーザ名</param>
+        /// <param name="containerServiceBaseUrl">コンテナサービスのベースURL</param>
+        /// <param name="token">要求をしたユーザの認証トークン</param>
+        private async Task<bool> BindRoleToServiceAccountAsync(string tenantName, string userName, string containerServiceBaseUrl, string token)
         {
             //既にバインド済みか確認
             var exists = (await SendGetRequestAsync(new RequestParam()
             {
-                BaseUrl = containerOptions.ContainerServiceBaseUrl,
+                BaseUrl = containerServiceBaseUrl,
                 ApiPath = $"/apis/rbac.authorization.k8s.io/v1/namespaces/{tenantName}/rolebindings/{tenantName}-{userName}",
                 Token = token
             })).IsSuccess;
@@ -1470,7 +1564,7 @@ namespace Nssol.Platypus.Services
             });
             var param = new RequestParam()
             {
-                BaseUrl = containerOptions.ContainerServiceBaseUrl,
+                BaseUrl = containerServiceBaseUrl,
                 ApiPath = $"/apis/rbac.authorization.k8s.io/v1/namespaces/{tenantName}/rolebindings",
                 Token = token,
                 Body = body,
@@ -1494,7 +1588,11 @@ namespace Nssol.Platypus.Services
         /// 存在しない場合は作成する。
         /// 取得に失敗した場合はnullを返す。
         /// </summary>
-        private async Task<string> GetUserTokenAsync(string tenantName, string userName, string token)
+        /// <param name="tenantName">テナント名</param>
+        /// <param name="userName">ユーザ名</param>
+        /// <param name="containerServiceBaseUrl">コンテナサービスのベースURL</param>
+        /// <param name="token">要求をしたユーザの認証トークン</param>
+        private async Task<string> GetUserTokenAsync(string tenantName, string userName, string containerServiceBaseUrl, string token)
         {
             // トークン取得前処理
             string secret = string.Empty;
@@ -1502,7 +1600,7 @@ namespace Nssol.Platypus.Services
             // 最大５回までポーリングする
             for (int i = 0; i < 5; i++)
             {
-                var result = await GetServiceAccountAsync(tenantName, userName, token);
+                var result = await GetServiceAccountAsync(tenantName, userName, containerServiceBaseUrl, token);
 
                 //そもそもアカウントが作られていない場合はエラー
                 if(result.IsSuccess == false)
@@ -1529,7 +1627,7 @@ namespace Nssol.Platypus.Services
             // トークン取得
             var response = (await SendGetRequestAsync(new RequestParam()
             {
-                BaseUrl = containerOptions.ContainerServiceBaseUrl,
+                BaseUrl = containerServiceBaseUrl,
                 ApiPath = $"/api/v1/namespaces/{tenantName}/secrets/{secret}",
                 Token = token
             }));
@@ -1813,10 +1911,14 @@ namespace Nssol.Platypus.Services
         /// <summary>
         /// kubernetesとのwebsocket接続を確立
         /// </summary>
-        public async Task<Result<ClientWebSocket, ContainerStatus>> ConnectWebSocketAsync(string jobName, string tenantName, string token)
+        /// <param name="jobName">ジョブ名</param>
+        /// <param name="tenantName">テナント名</param>
+        /// <param name="containerServiceBaseUrl">コンテナサービスのベースURL</param>
+        /// <param name="token">要求をしたユーザの認証トークン</param>
+        public async Task<Result<ClientWebSocket, ContainerStatus>> ConnectWebSocketAsync(string jobName, string tenantName, string containerServiceBaseUrl, string token)
         {
             //// ジョブに対応するポッドが存在する場合のみ、websocketを確立
-            var result = await GetPodForJobAsync(jobName, tenantName, token);
+            var result = await GetPodForJobAsync(jobName, tenantName, containerServiceBaseUrl, token);
             if (result.Error != null)
                 return Result<ClientWebSocket, ContainerStatus>.CreateErrorResult(result.Error);
 

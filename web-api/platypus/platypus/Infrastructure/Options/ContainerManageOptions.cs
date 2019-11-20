@@ -118,7 +118,7 @@ namespace Nssol.Platypus.Infrastructure.Options
         public string ShellColumns { get; set; }
 
         /// <summary>
-        /// データを取得するためのREST APIのベースURL。
+        /// データを取得するなどのためのREST APIのベースURL。
         /// </summary>
         public string WebServerUrl
         {

@@ -3,10 +3,7 @@ using Nssol.Platypus.Infrastructure.Infos;
 using Nssol.Platypus.Infrastructure.Types;
 using Nssol.Platypus.Models;
 using Nssol.Platypus.ServiceModels.ClusterManagementModels;
-using Nssol.Platypus.ServiceModels.KubernetesModels;
-using System;
 using System.Collections.Generic;
-using System.Linq;
 using System.Net.WebSockets;
 using System.Threading.Tasks;
 
@@ -31,43 +28,76 @@ namespace Nssol.Platypus.Services.Interfaces
         /// <summary>
         /// 全コンテナ情報を取得する
         /// </summary>
-        Task<Result<IEnumerable<ContainerDetailsInfo>, ContainerStatus>> GetAllContainerDetailsInfosAsync(string token, string tenantName = null);
+        /// <param name="containerServiceBaseUrl">コンテナサービスのベースURL</param>
+        /// <param name="token">要求をしたユーザの認証トークン</param>
+        /// <param name="tenantName">テナント名</param>
+        Task<Result<IEnumerable<ContainerDetailsInfo>, ContainerStatus>> GetAllContainerDetailsInfosAsync(string containerServiceBaseUrl, string token, string tenantName = null);
 
         /// <summary>
         /// 指定したコンテナのステータスを取得する。
         /// </summary>
-        Task<ContainerStatus> GetContainerStatusAsync(string containerName, string tenantName, string token);
+        /// <param name="containerName">コンテナ名</param>
+        /// <param name="tenantName">テナント名</param>
+        /// <param name="containerServiceBaseUrl">コンテナサービスのベースURL</param>
+        /// <param name="token">要求をしたユーザの認証トークン</param>
+        Task<ContainerStatus> GetContainerStatusAsync(string containerName, string tenantName, string containerServiceBaseUrl, string token);
 
         /// <summary>
         /// 指定したコンテナの詳細情報を取得する。
         /// </summary>
-        Task<ContainerDetailsInfo> GetContainerDetailsInfoAsync(string jobName, string tenantName, string token);
+        /// <param name="jobName">ジョブ名</param>
+        /// <param name="tenantName">テナント名</param>
+        /// <param name="containerServiceBaseUrl">コンテナサービスのベースURL</param>
+        /// <param name="token">要求をしたユーザの認証トークン</param>
+        Task<ContainerDetailsInfo> GetContainerDetailsInfoAsync(string jobName, string tenantName, string containerServiceBaseUrl, string token);
 
         /// <summary>
         /// 指定したコンテナの情報をエンドポイント付きで取得する。
         /// </summary>
-        Task<ContainerEndpointInfo> GetContainerEndpointInfoAsync(string containerName, string tenantName, string token);
-        
+        /// <param name="containerName">コンテナ名</param>
+        /// <param name="tenantName">テナント名</param>
+        /// <param name="containerServiceBaseUrl">コンテナサービスのベースURL</param>
+        /// <param name="token">要求をしたユーザの認証トークン</param>
+        Task<ContainerEndpointInfo> GetContainerEndpointInfoAsync(string containerName, string tenantName, string containerServiceBaseUrl, string token);
+
         /// <summary>
         /// コンテナを削除する。
         /// 対象コンテナが存在しない場合はエラーになる。
         /// </summary>
-        Task<bool> DeleteContainerAsync(ContainerType type, string containerName, string tenantName, string token);
+        /// <param name="type">コンテナ種別</param>
+        /// <param name="containerName">コンテナ名</param>
+        /// <param name="tenantName">テナント名</param>
+        /// <param name="containerServiceBaseUrl">コンテナサービスのベースURL</param>
+        /// <param name="token">削除要求をしたユーザの認証トークン</param>
+        /// <returns>成否</returns>
+        Task<bool> DeleteContainerAsync(ContainerType type, string containerName, string tenantName, string containerServiceBaseUrl, string token);
 
         /// <summary>
         /// 指定したコンテナのログを取得する
         /// </summary>
-        Task<Result<System.IO.Stream, ContainerStatus>> DownloadLogAsync(string containerName, string tenantName, string token);
+        /// <param name="containerName">コンテナ名</param>
+        /// <param name="tenantName">テナント名</param>
+        /// <param name="containerServiceBaseUrl">コンテナサービスのベースURL</param>
+        /// <param name="token">要求をしたユーザの認証トークン</param>
+        Task<Result<System.IO.Stream, ContainerStatus>> DownloadLogAsync(string containerName, string tenantName, string containerServiceBaseUrl, string token);
 
         /// <summary>
         /// 指定したテナントのイベントを取得する
         /// </summary>
-        Task<Result<IEnumerable<ContainerEventInfo>, ContainerStatus>> GetEventsAsync(Tenant tenant, string token);
+        /// <param name="tenant">テナント情報</param>
+        /// <param name="containerServiceBaseUrl">コンテナサービスのベースURL</param>
+        /// <param name="token">要求をしたユーザの認証トークン</param>
+        Task<Result<IEnumerable<ContainerEventInfo>, ContainerStatus>> GetEventsAsync(Tenant tenant, string containerServiceBaseUrl, string token);
 
         /// <summary>
         /// 指定したテナントの appName に対応する Pod 名を取得する
         /// </summary>
-        Task<Result<string, ContainerStatus>> GetPodNameAsync(string tenantName, string appName, int limit, string token);
+        /// <param name="tenantName">テナント名</param>
+        /// <param name="appName">appName</param>
+        /// <param name="limit">limit 値</param>
+        /// <param name="containerServiceBaseUrl">コンテナサービスのベースURL</param>
+        /// <param name="token">要求をしたユーザの認証トークン</param>
+        Task<Result<string, ContainerStatus>> GetPodNameAsync(string tenantName, string appName, int limit, string containerServiceBaseUrl, string token);
 
         /// <summary>
         /// 指定したテナントの Pod 上でコマンドを実行する。
@@ -130,7 +160,10 @@ namespace Nssol.Platypus.Services.Interfaces
         /// <summary>
         /// クラスタ管理サービスに新規テナントを登録する。
         /// </summary>
-        Task<bool> RegistTenantAsync(string tenantName);
+        /// <param name="tenantName">テナント名</param>
+        /// <param name="containerServiceBaseUrl">コンテナサービスのベースURL</param>
+        /// <param name="token">要求をしたユーザの認証トークン</param>
+        Task<bool> RegistTenantAsync(string tenantName, string containerServiceBaseUrl, string token);
 
         /// <summary>
         /// クラスタ管理サービスに新規ユーザを追加する。
@@ -140,12 +173,19 @@ namespace Nssol.Platypus.Services.Interfaces
         /// <remarks>
         /// 名前空間とロールは作成済みの前提。存在確認は行わない。
         /// </remarks>
-        Task<string> RegistUserAsync(string tenantName, string userName);
+        /// <param name="tenantName">テナント名</param>
+        /// <param name="userName">ユーザ名</param>
+        /// <param name="containerServiceBaseUrl">コンテナサービスのベースURL</param>
+        /// <param name="token">要求をしたユーザの認証トークン</param>
+        Task<string> RegistUserAsync(string tenantName, string userName, string containerServiceBaseUrl, string token);
 
         /// <summary>
         /// クラスタ管理サービスよりテナントを抹消(削除)する。
         /// </summary>
-        Task<bool> EraseTenantAsync(string tenantName);
+        /// <param name="tenantName">テナント名</param>
+        /// <param name="containerServiceBaseUrl">コンテナサービスのベースURL</param>
+        /// <param name="token">要求をしたユーザの認証トークン</param>
+        Task<bool> EraseTenantAsync(string tenantName, string containerServiceBaseUrl, string token);
 
         #endregion
 
@@ -153,7 +193,11 @@ namespace Nssol.Platypus.Services.Interfaces
         /// <summary>
         /// kubernetesとのwebsocket接続を確立
         /// </summary>
-        Task<Result<ClientWebSocket, ContainerStatus>> ConnectWebSocketAsync(string jobName, string tenantName, string token);
+        /// <param name="jobName">ジョブ名</param>
+        /// <param name="tenantName">テナント名</param>
+        /// <param name="containerServiceBaseUrl">コンテナサービスのベースURL</param>
+        /// <param name="token">要求をしたユーザの認証トークン</param>
+        Task<Result<ClientWebSocket, ContainerStatus>> ConnectWebSocketAsync(string jobName, string tenantName, string containerServiceBaseUrl, string token);
         #endregion
     }
 }

@@ -12,7 +12,6 @@ namespace Nssol.Platypus.Logic.Interfaces
     /// <summary>
     /// クラスタ管理・コンテナ管理を行うロジックのインターフェース
     /// </summary>
-
     public interface IClusterManagementLogic
     {
         #region コンテナ管理
@@ -51,27 +50,42 @@ namespace Nssol.Platypus.Logic.Interfaces
         /// <summary>
         /// 全コンテナの情報を取得する
         /// </summary>
-        Task<Result<IEnumerable<ContainerDetailsInfo>, ContainerStatus>> GetAllContainerDetailsInfosAsync();
+        /// <param name="cluster">オンプレ環境以外のクラスタ情報（オンプレの場合はnull）</param>
+        Task<Result<IEnumerable<ContainerDetailsInfo>, ContainerStatus>> GetAllContainerDetailsInfosAsync(Cluster cluster);
 
         /// <summary>
         /// 特定のテナントに紐づいた全コンテナの情報を取得する
         /// </summary>
-        Task<Result<IEnumerable<ContainerDetailsInfo>, ContainerStatus>> GetAllContainerDetailsInfosAsync(string tenantName);
+        /// <param name="tenantName">テナント名</param>
+        /// <param name="cluster">オンプレ環境以外のクラスタ情報（オンプレの場合はnull）</param>
+        Task<Result<IEnumerable<ContainerDetailsInfo>, ContainerStatus>> GetAllContainerDetailsInfosAsync(string tenantName, Cluster cluster);
 
         /// <summary>
         /// 指定したコンテナのエンドポイント付きの情報をクラスタ管理サービスに問い合わせる。
         /// </summary>
-        Task<ContainerEndpointInfo> GetContainerEndpointInfoAsync(string containerName, string tenantName, bool force);
+        /// <param name="containerName">コンテナ名</param>
+        /// <param name="tenantName">テナント名</param>
+        /// <param name="cluster">オンプレ環境以外のクラスタ情報（オンプレの場合はnull）</param>
+        /// <param name="force">Admin権限で実行するか</param>
+        Task<ContainerEndpointInfo> GetContainerEndpointInfoAsync(string containerName, string tenantName, Cluster cluster, bool force);
 
         /// <summary>
         /// 指定したコンテナの詳細情報をクラスタ管理サービスに問い合わせる。
         /// </summary>
-        Task<ContainerDetailsInfo> GetContainerDetailsInfoAsync(string containerName, string tenantName, bool force);
+        /// <param name="containerName">コンテナ名</param>
+        /// <param name="tenantName">テナント名</param>
+        /// <param name="cluster">オンプレ環境以外のクラスタ情報（オンプレの場合はnull）</param>
+        /// <param name="force">Admin権限で実行するか</param>
+        Task<ContainerDetailsInfo> GetContainerDetailsInfoAsync(string containerName, string tenantName, Cluster cluster, bool force);
 
         /// <summary>
         /// 指定したコンテナのステータスをクラスタ管理サービスに問い合わせる。
         /// </summary>
-        Task<ContainerStatus> GetContainerStatusAsync(string containerName, string tenantName, bool force);
+        /// <param name="containerName">コンテナ名</param>
+        /// <param name="tenantName">テナント名</param>
+        /// <param name="cluster">オンプレ環境以外のクラスタ情報（オンプレの場合はnull）</param>
+        /// <param name="force">Admin権限で実行するか</param>
+        Task<ContainerStatus> GetContainerStatusAsync(string containerName, string tenantName, Cluster cluster, bool force);
 
         /// <summary>
         /// 指定したTensorBoardコンテナのステータスをクラスタ管理サービスに問い合わせ、結果でDBを更新する。
@@ -82,22 +96,39 @@ namespace Nssol.Platypus.Logic.Interfaces
         /// 指定したコンテナを削除する。
         /// 対象コンテナが存在しない場合はエラーになる。
         /// </summary>
-        Task<bool> DeleteContainerAsync(ContainerType type, string containerName, string tenantName, bool force);
+        /// <param name="type">コンテナ種別</param>
+        /// <param name="containerName">コンテナ名</param>
+        /// <param name="tenantName">テナント名</param>
+        /// <param name="cluster">オンプレ環境以外のクラスタ情報（オンプレの場合はnull）</param>
+        /// <param name="force">Admin権限で実行するか</param>
+        Task<bool> DeleteContainerAsync(ContainerType type, string containerName, string tenantName, Cluster cluster, bool force);
 
         /// <summary>
         /// 指定したコンテナのログを取得する
         /// </summary>
-        Task<Result<System.IO.Stream, ContainerStatus>> DownloadLogAsync(string containerName, string tenantName, bool force);
+        /// <param name="containerName">コンテナ名</param>
+        /// <param name="tenantName">テナント名</param>
+        /// <param name="cluster">オンプレ環境以外のクラスタ情報（オンプレの場合はnull）</param>
+        /// <param name="force">Admin権限で実行するか</param>
+        Task<Result<System.IO.Stream, ContainerStatus>> DownloadLogAsync(string containerName, string tenantName, Cluster cluster, bool force);
 
         /// <summary>
         /// 指定したテナントのイベントを取得する
         /// </summary>
-        Task<Result<IEnumerable<ContainerEventInfo>, ContainerStatus>> GetEventsAsync(Tenant tenant, bool force);
+        /// <param name="tenant">テナント情報</param>
+        /// <param name="cluster">オンプレ環境以外のクラスタ情報（オンプレの場合はnull）</param>
+        /// <param name="force">Admin権限で実行するか</param>
+        Task<Result<IEnumerable<ContainerEventInfo>, ContainerStatus>> GetEventsAsync(Tenant tenant, Cluster cluster, bool force);
 
         /// <summary>
         /// 指定したコンテナのイベントを取得する
         /// </summary>
-        Task<Result<IEnumerable<ContainerEventInfo>, ContainerStatus>> GetEventsAsync(Tenant tenant, string containerName, bool force, bool errorOnly);
+        /// <param name="tenant">テナント情報</param>
+        /// <param name="containerName">コンテナ名</param>
+        /// <param name="cluster">オンプレ環境以外のクラスタ情報（オンプレの場合はnull）</param>
+        /// <param name="force">Admin権限で実行するか</param>
+        /// <param name="errorOnly">エラー情報だけか否か</param>
+        Task<Result<IEnumerable<ContainerEventInfo>, ContainerStatus>> GetEventsAsync(Tenant tenant, string containerName, Cluster cluster, bool force, bool errorOnly);
         #endregion
 
         #region クラスタ管理
@@ -166,18 +197,23 @@ namespace Nssol.Platypus.Logic.Interfaces
         /// 指定したテナントを作成する。
         /// 既にある場合は何もしない。
         /// </summary>
-        Task<bool> RegistTenantAsync(string tenantName);
+        /// <param name="tenantName">テナント名</param>
+        /// <param name="cluster">オンプレ環境以外のクラスタ情報（オンプレの場合はnull）</param>
+        Task<bool> RegistTenantAsync(string tenantName, Cluster cluster);
 
         /// <summary>
         /// ログイン中のユーザ＆テナントに対する、クラスタ管理サービスにアクセスするためのトークンを取得する。
         /// 存在しない場合、新規に作成する。
         /// </summary>
-        Task<string> GetUserAccessTokenAsync();
+        /// <param name="cluster">オンプレ環境以外のクラスタ情報（オンプレの場合はnull）</param>
+        Task<string> GetUserAccessTokenAsync(Cluster cluster);
 
         /// <summary>
         /// 指定したテナントを抹消(削除)する。
         /// </summary>
-        Task<bool> EraseTenantAsync(string tenantName);
+        /// <param name="tenantName">テナント名</param>
+        /// <param name="cluster">オンプレ環境以外のクラスタ情報（オンプレの場合はnull）</param>
+        Task<bool> EraseTenantAsync(string tenantName, Cluster cluster);
 
         #endregion
 

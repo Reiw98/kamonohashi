@@ -11,8 +11,8 @@
     <el-row>
       <el-table class="data-table pl-index-table" :data="tableData" @row-click="openEditDialog" border>
         <el-table-column prop="id" label="ID" width="120px"/>
-        <el-table-column prop="hostName" label="ホスト名" width="auto"/>
         <el-table-column prop="displayName" label="表示名" width="auto"/>
+        <el-table-column prop="hostName" label="ホスト名" width="auto"/>
         <el-table-column prop="memo" label="メモ" width="auto"/>
       </el-table>
     </el-row>

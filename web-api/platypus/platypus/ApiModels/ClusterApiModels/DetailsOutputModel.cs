@@ -10,8 +10,14 @@ namespace Nssol.Platypus.ApiModels.ClusterApiModels
     {
         public DetailsOutputModel(Cluster cluster) : base(cluster)
         {
+            PortNo = cluster.PortNo;
             ResourceManageKey = cluster.ResourceManageKey;
         }
+
+        /// <summary>
+        /// ポート番号
+        /// </summary>
+        public int PortNo { get; set; }
 
         /// <summary>
         /// リソース管理キー。

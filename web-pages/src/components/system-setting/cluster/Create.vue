@@ -6,12 +6,22 @@
              :close-on-click-modal="false">
     <el-form ref="createForm" :model="this" :rules="rules">
       <pl-display-error :error="error"/>
-      <el-form-item label="ホスト名" prop="hostName">
-        <el-input v-model="hostName"/>
-      </el-form-item>
       <el-form-item label="表示名" prop="displayName">
         <el-input v-model="displayName"/>
       </el-form-item>
+      <el-row>
+          <el-col :span="16">
+            <el-form-item label="ホスト名" prop="hostName">
+              <el-input v-model="hostName"/>
+            </el-form-item>
+          </el-col>
+          <el-col :span="8">
+            <el-form-item label="ポート" prop="portNo">
+              <el-input-number v-model="portNo" :min="1" :max="65535"
+                               controls-position="right" style="width:100%;"/>
+          </el-form-item>
+        </el-col>
+      </el-row>
       <el-form-item label="トークン" prop="token">
         <el-input v-model="token"/>
       </el-form-item>
@@ -44,20 +54,26 @@
       return {
         dialogVisible: true,
         error: undefined,
-        hostName: undefined,
         displayName: undefined,
+        hostName: undefined,
+        portNo: 6443,
         token: undefined,
         memo: undefined,
         selectedTenants: [], // Selected tenants which can access this node.
         tenants: [], // Tenants to display on a transfer component.
         titles: ['アクセス拒否', 'アクセス許可'], // The title of the transfer component.
         rules: {
+          displayName: [{
+            required: true,
+            trigger: 'blur',
+            message: '必須項目です'
+          }],
           hostName: [{
             required: true,
             trigger: 'blur',
             message: '必須項目です'
           }],
-          displayName: [{
+          portNo: [{
             required: true,
             trigger: 'blur',
             message: '必須項目です'
@@ -77,8 +93,9 @@
             if (valid) {
               try {
                 let params = {
-                  hostName: this.hostName,
                   displayName: this.displayName,
+                  hostName: this.hostName,
+                  portNo: this.portNo,
                   memo: this.memo,
                   resourceManageKey: this.token,
                   assignedTenantIds: this.selectedTenants

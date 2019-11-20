@@ -9,16 +9,22 @@ namespace Nssol.Platypus.ApiModels.ClusterApiModels
     public class CreateInputModel
     {
         /// <summary>
+        /// 表示名
+        /// </summary>
+        [Required]
+        public string DisplayName { get; set; }
+
+        /// <summary>
         /// ホスト名
         /// </summary>
         [Required]
         public string HostName { get; set; }
 
         /// <summary>
-        /// 表示名
+        /// ポート番号
         /// </summary>
         [Required]
-        public string DisplayName { get; set; }
+        public int PortNo { get; set; }
 
         /// <summary>
         /// リソース管理キー。

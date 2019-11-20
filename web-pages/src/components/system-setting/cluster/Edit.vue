@@ -6,12 +6,22 @@
              :close-on-click-modal="false">
     <el-form ref="createForm" :model="this" :rules="rules">
       <pl-display-error :error="error"/>
-      <el-form-item label="ホスト名" prop="hostName">
-        <el-input v-model="hostName"/>
-      </el-form-item>
       <el-form-item label="表示名" prop="displayName">
         <el-input v-model="displayName"/>
       </el-form-item>
+      <el-row>
+        <el-col :span="16">
+          <el-form-item label="ホスト名" prop="hostName">
+            <el-input v-model="hostName"/>
+          </el-form-item>
+        </el-col>
+        <el-col :span="8">
+          <el-form-item label="ポート" prop="portNo">
+            <el-input-number v-model="portNo" :min="1" :max="65535"
+                             controls-position="right" style="width: 100%;"/>
+          </el-form-item>
+        </el-col>
+      </el-row>
       <el-form-item label="トークン" prop="token">
         <el-input v-model="token"/>
       </el-form-item>
@@ -52,8 +62,9 @@
       return {
         dialogVisible: true,
         error: undefined,
-        hostName: undefined,
         displayName: undefined,
+        hostName: undefined,
+        portNo: undefined,
         token: undefined,
         memo: undefined,
         selectedTenants: [], // Selected tenants which can access this node.
@@ -61,6 +72,11 @@
         titles: ['アクセス拒否', 'アクセス許可'], // The title of the transfer component.
         rules: {
           hostName: [{
+            required: true,
+            trigger: 'blur',
+            message: '必須項目です'
+          }],
+          portNo: [{
             required: true,
             trigger: 'blur',
             message: '必須項目です'
@@ -90,8 +106,9 @@
               let params = {
                 id: this.id,
                 model: {
-                  hostName: this.hostName,
                   displayName: this.displayName,
+                  hostName: this.hostName,
+                  portNo: this.portNo,
                   memo: this.memo,
                   resourceManageKey: this.token,
                   assignedTenantIds: this.selectedTenants
@@ -108,8 +125,9 @@
       },
       async retrieveData () {
         let result = (await api.cluster.admin.getById({id: this.id})).data
-        this.hostName = result.hostName
         this.displayName = result.displayName
+        this.hostName = result.hostName
+        this.portNo = result.portNo
         this.memo = result.memo
         this.token = result.resourceManageKey
         this.selectedTenants = result.assignedTenants ? result.assignedTenants.map(t => {

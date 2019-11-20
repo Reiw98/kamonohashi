@@ -150,7 +150,7 @@ namespace Nssol.Platypus.Logic.HostedService
             try
             {
                 // Pod 名の取得
-                var resultPod = clusterManagementService.GetPodNameAsync(systemNamespace, APP_NAME, LIMIT, kubernetesToken).Result;
+                var resultPod = clusterManagementService.GetPodNameAsync(systemNamespace, APP_NAME, LIMIT, null, kubernetesToken).Result;
                 if (!resultPod.IsSuccess)
                 {
                     LogError($"Pod 名を取得できませんでしたので Postgres バックアップ処理は中断します。 namespace=\"{systemNamespace}\", appName=\"{APP_NAME}\"");

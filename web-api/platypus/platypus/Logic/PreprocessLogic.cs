@@ -62,7 +62,7 @@ namespace Nssol.Platypus.Logic
             {
                 //コンテナが動いていれば、停止する
                 await clusterManagementLogic.DeleteContainerAsync(
-                    ContainerType.Preprocessing, preprocessHistory.Name, CurrentUserInfo.SelectedTenant.Name, force);
+                    ContainerType.Preprocessing, preprocessHistory.Name, CurrentUserInfo.SelectedTenant.Name, null, force);
             }
 
             return result;

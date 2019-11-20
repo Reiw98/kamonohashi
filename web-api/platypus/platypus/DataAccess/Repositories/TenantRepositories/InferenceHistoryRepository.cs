@@ -34,7 +34,7 @@ namespace Nssol.Platypus.DataAccess.Repositories.TenantRepositories
         }
 
         /// <summary>
-        /// 全学習履歴（データセットを含む）を並べ替えありで取得します。
+        /// 全推論履歴（データセットを含む）を並べ替えありで取得します。
         /// </summary>
         public IQueryable<InferenceHistory> GetAllIncludeDataSetWithOrdering()
         {
@@ -42,7 +42,7 @@ namespace Nssol.Platypus.DataAccess.Repositories.TenantRepositories
         }
 
         /// <summary>
-        /// 全学習履歴の名前とIDのみ取得する
+        /// 全推論履歴の名前とIDのみ取得する
         /// </summary>
         public async Task<IEnumerable<InferenceHistory>> GetAllNameAsync()
         {
@@ -54,7 +54,7 @@ namespace Nssol.Platypus.DataAccess.Repositories.TenantRepositories
         /// <summary>
         /// 指定された推論履歴IDの推論履歴エンティティ（外部参照を含む）を取得します。
         /// </summary>
-        /// <param name="id">学習履歴ID</param>
+        /// <param name="id">推論履歴ID</param>
         public async Task<InferenceHistory> GetIncludeAllAsync(long id)
         {
             return await FindAll(t => t.Id == id).Include(t => t.DataSet)
@@ -65,6 +65,16 @@ namespace Nssol.Platypus.DataAccess.Repositories.TenantRepositories
                 .SingleOrDefaultAsync();
         }
 
+        /// <summary>
+        /// 指定された推論履歴IDの推論履歴エンティティ（クラスタを含む）を取得します。
+        /// </summary>
+        /// <param name="id">推論履歴ID</param>
+        public async Task<InferenceHistory> GetIncludeClusterAsync(long id)
+        {
+            return await FindAll(t => t.Id == id)
+                .Include(t => t.Cluster)
+                .SingleOrDefaultAsync();
+        }
 
         /// <summary>
         /// データセットIDに紐づく推論履歴が存在するかチェックします。
@@ -96,7 +106,7 @@ namespace Nssol.Platypus.DataAccess.Repositories.TenantRepositories
         }
 
         /// <summary>
-        /// 学習履歴のステータスを変更する。
+        /// 推論履歴のステータスを変更する。
         /// 存在チェックは行わない。
         /// </summary>
         public async Task UpdateStatusAsync(long id, ContainerStatus status, bool force)
@@ -107,7 +117,7 @@ namespace Nssol.Platypus.DataAccess.Repositories.TenantRepositories
         }
 
         /// <summary>
-        /// 学習履歴のステータスを変更する。
+        /// 推論履歴のステータスを変更する。
         /// 存在チェックは行わない。
         /// </summary>
         public async Task UpdateStatusAsync(long id, ContainerStatus status, DateTime? startedAt, DateTime completedAt, bool force)

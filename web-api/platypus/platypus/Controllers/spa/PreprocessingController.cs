@@ -396,7 +396,7 @@ namespace Nssol.Platypus.Controllers.spa
             if (status.Exist())
             {
                 //コンテナがまだ存在している場合、情報を更新する
-                var newStatus = await clusterManagementLogic.GetContainerStatusAsync(history.Name, CurrentUserInfo.SelectedTenant.Name, false);
+                var newStatus = await clusterManagementLogic.GetContainerStatusAsync(history.Name, CurrentUserInfo.SelectedTenant.Name, null, false);
 
                 if (status.Key != newStatus.Key)
                 {
@@ -465,7 +465,7 @@ namespace Nssol.Platypus.Controllers.spa
                 return JsonBadRequest($"A container for the preprocessing does not exist.");
             }
 
-            var events = await clusterManagementLogic.GetEventsAsync(CurrentUserInfo.SelectedTenant, history.Name, false, true);
+            var events = await clusterManagementLogic.GetEventsAsync(CurrentUserInfo.SelectedTenant, history.Name, null, false, true);
 
             if (events.IsSuccess == false)
             {
@@ -771,7 +771,7 @@ namespace Nssol.Platypus.Controllers.spa
             {
                 //コンテナが動いていれば、停止する
                 await clusterManagementLogic.DeleteContainerAsync(
-                    ContainerType.Preprocessing, preprocessHistory.Name, CurrentUserInfo.SelectedTenant.Name, false);
+                    ContainerType.Preprocessing, preprocessHistory.Name, CurrentUserInfo.SelectedTenant.Name, null, false);
             }
 
             preprocessHistory.CompletedAt = DateTime.Now;

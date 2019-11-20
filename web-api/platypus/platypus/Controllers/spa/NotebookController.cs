@@ -11,6 +11,7 @@ using Nssol.Platypus.Infrastructure.Infos;
 using Nssol.Platypus.Infrastructure.Options;
 using Nssol.Platypus.Infrastructure.Types;
 using Nssol.Platypus.Logic.Interfaces;
+using Nssol.Platypus.Models;
 using Nssol.Platypus.Models.TenantModels;
 using System;
 using System.Collections.Generic;
@@ -29,6 +30,7 @@ namespace Nssol.Platypus.Controllers.spa
     {
         private readonly INotebookHistoryRepository notebookHistoryRepository;
         private readonly IDataSetRepository dataSetRepository;
+        private readonly IClusterRepository clusterRepository;
         private readonly INotebookLogic notebookLogic;
         private readonly IStorageLogic storageLogic;
         private readonly IGitLogic gitLogic;
@@ -37,6 +39,7 @@ namespace Nssol.Platypus.Controllers.spa
         public NotebookController(
             INotebookHistoryRepository notebookHistoryRepository,
             IDataSetRepository dataSetRepository,
+            IClusterRepository clusterRepository,
             INotebookLogic notebookLogic,
             IStorageLogic storageLogic,
             IGitLogic gitLogic,
@@ -46,6 +49,7 @@ namespace Nssol.Platypus.Controllers.spa
         {
             this.notebookHistoryRepository = notebookHistoryRepository;
             this.dataSetRepository = dataSetRepository;
+            this.clusterRepository = clusterRepository;
             this.notebookLogic = notebookLogic;
             this.storageLogic = storageLogic;
             this.gitLogic = gitLogic;
@@ -105,8 +109,15 @@ namespace Nssol.Platypus.Controllers.spa
             var status = history.GetStatus();
             if (status.Exist())
             {
+                // クラスタが設定されている場合、クラスタ情報を取得する
+                Cluster cluster = null;
+                if (history.ClusterId.HasValue)
+                {
+                    cluster = await clusterRepository.GetByIdAsync(history.ClusterId.Value);
+                }
+
                 //ノートブックコンテナがまだ進行中の場合、情報を更新する
-                var newStatus = await clusterManagementLogic.GetContainerStatusAsync(history.Key, CurrentUserInfo.SelectedTenant.Name, false);
+                var newStatus = await clusterManagementLogic.GetContainerStatusAsync(history.Key, CurrentUserInfo.SelectedTenant.Name, cluster, false);
 
                 if (status.Key != newStatus.Key)
                 {
@@ -177,7 +188,7 @@ namespace Nssol.Platypus.Controllers.spa
             if (status.Exist())
             {
                 //コンテナがまだ存在している場合、情報を更新する
-                var details = await clusterManagementLogic.GetContainerEndpointInfoAsync(notebookHistory.Key, CurrentUserInfo.SelectedTenant.Name, false);
+                var details = await clusterManagementLogic.GetContainerEndpointInfoAsync(notebookHistory.Key, CurrentUserInfo.SelectedTenant.Name, notebookHistory.Cluster, false);
                 model.Status = details.Status.Name;
                 model.StatusType = details.Status.StatusType;
 
@@ -283,7 +294,7 @@ namespace Nssol.Platypus.Controllers.spa
             }
 
             //データの存在チェック
-            var notebookHistory = await notebookHistoryRepository.GetByIdAsync(id.Value);
+            var notebookHistory = await notebookHistoryRepository.GetIncludeClusterAsync(id.Value);
             if (notebookHistory == null)
             {
                 return JsonNotFound($"Notebook ID {id} is not found.");
@@ -294,14 +305,14 @@ namespace Nssol.Platypus.Controllers.spa
             if (status.Exist())
             {
                 //Notebookコンテナが起動中の場合、情報を更新する
-                status = await clusterManagementLogic.GetContainerStatusAsync(notebookHistory.Key, CurrentUserInfo.SelectedTenant.Name, false);
+                status = await clusterManagementLogic.GetContainerStatusAsync(notebookHistory.Key, CurrentUserInfo.SelectedTenant.Name, notebookHistory.Cluster, false);
             }
 
             if (status.Exist())
             {
                 //実行中であれば、コンテナを削除
                 await clusterManagementLogic.DeleteContainerAsync(
-                    ContainerType.Notebook, notebookHistory.Key, CurrentUserInfo.SelectedTenant.Name, false);
+                    ContainerType.Notebook, notebookHistory.Key, CurrentUserInfo.SelectedTenant.Name, notebookHistory.Cluster, false);
             }
 
             notebookHistoryRepository.Delete(notebookHistory);
@@ -320,7 +331,7 @@ namespace Nssol.Platypus.Controllers.spa
         [ProducesResponseType(typeof(ContainerEventInfo), (int)HttpStatusCode.OK)]
         public async Task<IActionResult> GetErrorEventAsync(long id)
         {
-            var history = await notebookHistoryRepository.GetByIdAsync(id);
+            var history = await notebookHistoryRepository.GetIncludeClusterAsync(id);
             if (history == null)
             {
                 return JsonNotFound($"Notebook ID {id} is not found.");
@@ -330,7 +341,7 @@ namespace Nssol.Platypus.Controllers.spa
                 return JsonBadRequest($"A container for Notebook ID {id} does not exist.");
             }
 
-            var events = await clusterManagementLogic.GetEventsAsync(CurrentUserInfo.SelectedTenant, history.Key, false, true);
+            var events = await clusterManagementLogic.GetEventsAsync(CurrentUserInfo.SelectedTenant, history.Key, history.Cluster, false, true);
 
             if (events.IsSuccess == false)
             {
@@ -354,7 +365,7 @@ namespace Nssol.Platypus.Controllers.spa
         public async Task<IActionResult> GetEndpointAsync(long id, [FromServices] IOptions<ContainerManageOptions> options)
         {
             //データの存在チェック
-            var notebookHistory = await notebookHistoryRepository.GetByIdAsync(id);
+            var notebookHistory = await notebookHistoryRepository.GetIncludeClusterAsync(id);
             if (notebookHistory == null)
             {
                 return JsonNotFound($"Notebook ID {id} is not found.");
@@ -367,7 +378,7 @@ namespace Nssol.Platypus.Controllers.spa
             if (status.Exist())
             {
                 //コンテナがまだ存在している場合、情報を更新する
-                var details = await clusterManagementLogic.GetContainerEndpointInfoAsync(notebookHistory.Key, CurrentUserInfo.SelectedTenant.Name, false);
+                var details = await clusterManagementLogic.GetContainerEndpointInfoAsync(notebookHistory.Key, CurrentUserInfo.SelectedTenant.Name, notebookHistory.Cluster, false);
                 //ステータスを更新
                 notebookHistory.Status = details.Status.Key;
                 if (notebookHistory.StartedAt == null)

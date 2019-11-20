@@ -21,6 +21,7 @@ namespace Nssol.Platypus.DataAccess.Core
         private CommonDbContext dbContext;
 
         private readonly DeployOptions deployOptions;
+        private readonly ContainerManageOptions containerOptions;
         private readonly IRoleRepository roleRepository;
         private readonly IGitRepository gitRepository;
         private readonly IRegistryRepository registryRepository;
@@ -34,6 +35,7 @@ namespace Nssol.Platypus.DataAccess.Core
             IGitRepository gitRepository,
             IRegistryRepository registryRepository,
             IOptions<DeployOptions> deployOptions,
+            IOptions<ContainerManageOptions> containerOptions,
             IObjectStorageService objectStorageService,
             IClusterManagementService clusterManagementService,
             ILogger<Seed> logger
@@ -44,6 +46,7 @@ namespace Nssol.Platypus.DataAccess.Core
             this.gitRepository = gitRepository;
             this.registryRepository = registryRepository;
             this.deployOptions = deployOptions.Value;
+            this.containerOptions = containerOptions.Value;
             this.objectStorageService = objectStorageService;
             this.clusterManagementService = clusterManagementService;
             this.logger = logger;
@@ -281,7 +284,7 @@ namespace Nssol.Platypus.DataAccess.Core
         /// </summary>
         public bool SyncInitialClusterManager()
         {
-            bool ret = clusterManagementService.RegistTenantAsync(ApplicationConst.DefaultFirstTenantName).Result;
+            bool ret = clusterManagementService.RegistTenantAsync(ApplicationConst.DefaultFirstTenantName, containerOptions.ContainerServiceBaseUrl, containerOptions.ResourceManageKey).Result;
             if (!ret)
             {
                 LogWarn($"Cluster(k8s) のネームスペース {ApplicationConst.DefaultFirstTenantName} の作成に失敗しました。");

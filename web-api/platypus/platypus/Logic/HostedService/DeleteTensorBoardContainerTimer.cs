@@ -27,6 +27,11 @@ namespace Nssol.Platypus.Logic.HostedService
         private readonly string kubernetesToken;
 
         /// <summary>
+        /// コンテナ管理サービスのベースURL (環境変数、または launchSettings.json で設定)
+        /// </summary>
+        private readonly string containerServiceBaseUrl;
+
+        /// <summary>
         /// コンストラクタで各 DI オブジェクトを引数で受け取ります。
         /// </summary>
         public DeleteTensorBoardContainerTimer(
@@ -45,6 +50,8 @@ namespace Nssol.Platypus.Logic.HostedService
 
             // kubernetes の token
             this.kubernetesToken = containerManageOptions.Value.ResourceManageKey;
+            // コンテナ管理サービスのベースURL
+            this.containerServiceBaseUrl = containerManageOptions.Value.ContainerServiceBaseUrl;
         }
 
         /// <summary>
@@ -86,7 +93,7 @@ namespace Nssol.Platypus.Logic.HostedService
                     try
                     {
                         // kubernetes 上の実コンテナを削除
-                        var destroyResult = clusterManagementService.DeleteContainerAsync(ContainerType.TensorBoard, container.Name, container.Tenant.Name, kubernetesToken).Result;
+                        var destroyResult = clusterManagementService.DeleteContainerAsync(ContainerType.TensorBoard, container.Name, container.Tenant.Name, containerServiceBaseUrl, kubernetesToken).Result;
                         if (destroyResult)
                         {
                             // 実際に対応する削除したならカウントアップ

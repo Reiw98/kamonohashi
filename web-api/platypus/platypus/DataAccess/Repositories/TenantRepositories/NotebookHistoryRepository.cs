@@ -62,7 +62,18 @@ namespace Nssol.Platypus.DataAccess.Repositories.TenantRepositories
         public async Task<IEnumerable<NotebookHistory>> GetAllIncludeTenantAsNoTrackingAsync()
         {
             return await GetModelAll<NotebookHistory>(true).Include(t => t.Tenant)
-                .OrderByDescending(t => t.Id).AsNoTracking().ToListAsync();
+                .OrderByDescending(t => t.Id).AsNoTracking().Include(t => t.Cluster).ToListAsync();
+        }
+
+        /// <summary>
+        /// 指定されたノートブック履歴IDのノートブック履歴エンティティ（クラスタを含む）を取得する
+        /// </summary>
+        /// <param name="id">ノートブック履歴ID</param>
+        public async Task<NotebookHistory> GetIncludeClusterAsync(long id)
+        {
+            return await FindAll(t => t.Id == id)
+                .Include(t => t.Cluster)
+                .SingleOrDefaultAsync();
         }
 
         /// <summary>

@@ -78,7 +78,7 @@ namespace Nssol.Platypus.Controllers.spa
                 result.Add(info.Name, new NodeResourceOutputModel(info));
             }
 
-            var response = await clusterManagementLogic.GetAllContainerDetailsInfosAsync();
+            var response = await clusterManagementLogic.GetAllContainerDetailsInfosAsync(null);
             if (response.IsSuccess)
             {
                 foreach(var container in response.Value)
@@ -130,7 +130,7 @@ namespace Nssol.Platypus.Controllers.spa
         {
             var result = tenantRepository.GetAllTenants().ToDictionary(t => t.Name, t => new TenantResourceOutputModel(t));
             
-            var response = await clusterManagementLogic.GetAllContainerDetailsInfosAsync();
+            var response = await clusterManagementLogic.GetAllContainerDetailsInfosAsync(null);
             if (response.IsSuccess)
             {
                 foreach (var container in response.Value)
@@ -172,7 +172,7 @@ namespace Nssol.Platypus.Controllers.spa
         [ProducesResponseType((int)HttpStatusCode.OK, Type = typeof(IEnumerable<ContainerDetailsOutputModel>))]
         public async Task<IActionResult> GetResourceByContainer()
         {
-            var result = await clusterManagementLogic.GetAllContainerDetailsInfosAsync();
+            var result = await clusterManagementLogic.GetAllContainerDetailsInfosAsync(null);
             if (result.IsSuccess)
             {
                 return JsonOK(result.Value.Select(info => CreateContainerDetailsOutputModel(info)));
@@ -244,7 +244,7 @@ namespace Nssol.Platypus.Controllers.spa
                 return JsonNotFound($"Tenant ID {tenantId} is not found.");
             }
 
-            var info = await clusterManagementLogic.GetContainerDetailsInfoAsync(name, tenant.Name, true);
+            var info = await clusterManagementLogic.GetContainerDetailsInfoAsync(name, tenant.Name, null, true);
             if(info.Status == ContainerStatus.None)
             {
                 return JsonNotFound($"Container named {name} is not found.");
@@ -284,7 +284,7 @@ namespace Nssol.Platypus.Controllers.spa
                 return JsonNotFound($"Tenant ID {tenantId} is not found.");
             }
 
-            var fileContents = await clusterManagementLogic.DownloadLogAsync(name, tenant.Name, true);
+            var fileContents = await clusterManagementLogic.DownloadLogAsync(name, tenant.Name, null, true);
 
             if (fileContents.IsSuccess == false)
             {
@@ -319,7 +319,7 @@ namespace Nssol.Platypus.Controllers.spa
                 return JsonNotFound($"Tenant ID {tenantId} is not found.");
             }
 
-            var events = await clusterManagementLogic.GetEventsAsync(tenant, name, true, true);
+            var events = await clusterManagementLogic.GetEventsAsync(tenant, name, null, true, true);
 
             if (events.IsSuccess == false)
             {
@@ -505,7 +505,7 @@ namespace Nssol.Platypus.Controllers.spa
                     break;
                 default:
                     //正体不明コンテナを削除する
-                    var result = await clusterManagementLogic.DeleteContainerAsync(ContainerType.Unknown, name, tenant.Name, force);
+                    var result = await clusterManagementLogic.DeleteContainerAsync(ContainerType.Unknown, name, tenant.Name, null, force);
                     if (result == false)
                     {
                         return JsonNotFound($"Container named {name} is not found.");
@@ -525,7 +525,7 @@ namespace Nssol.Platypus.Controllers.spa
         [ProducesResponseType((int)HttpStatusCode.OK, Type = typeof(IEnumerable<ContainerDetailsForTenantOutputModel>))]
         public async Task<IActionResult> GetResourceForTenant()
         {
-            var result = await clusterManagementLogic.GetAllContainerDetailsInfosAsync(CurrentUserInfo.SelectedTenant.Name);
+            var result = await clusterManagementLogic.GetAllContainerDetailsInfosAsync(CurrentUserInfo.SelectedTenant.Name, null);
             if (result.IsSuccess)
             {
                 return JsonOK(result.Value.Select(info => new ContainerDetailsForTenantOutputModel(info)
@@ -585,7 +585,7 @@ namespace Nssol.Platypus.Controllers.spa
             }
 
             // 全てのコンテナ情報を取得
-            var response = await clusterManagementLogic.GetAllContainerDetailsInfosAsync();
+            var response = await clusterManagementLogic.GetAllContainerDetailsInfosAsync(null);
             if (!response.IsSuccess)
             {
                 // 取得に失敗したならエラーと見做す
@@ -639,7 +639,7 @@ namespace Nssol.Platypus.Controllers.spa
 
             var tenant = CurrentUserInfo.SelectedTenant;
 
-            var info = await clusterManagementLogic.GetContainerDetailsInfoAsync(name, tenant.Name, false);
+            var info = await clusterManagementLogic.GetContainerDetailsInfoAsync(name, tenant.Name, null, false);
             if (info.Status == ContainerStatus.None)
             {
                 return JsonNotFound($"Container named {name} is not found.");
@@ -671,7 +671,7 @@ namespace Nssol.Platypus.Controllers.spa
 
             var tenant = CurrentUserInfo.SelectedTenant;
 
-            var fileContents = await clusterManagementLogic.DownloadLogAsync(name, tenant.Name, false);
+            var fileContents = await clusterManagementLogic.DownloadLogAsync(name, tenant.Name, null, false);
 
             if (fileContents.IsSuccess == false)
             {

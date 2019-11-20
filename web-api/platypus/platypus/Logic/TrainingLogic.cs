@@ -1,30 +1,42 @@
 ﻿using Nssol.Platypus.DataAccess.Core;
+using Nssol.Platypus.DataAccess.Repositories.Interfaces;
 using Nssol.Platypus.DataAccess.Repositories.Interfaces.TenantRepositories;
 using Nssol.Platypus.Infrastructure;
 using Nssol.Platypus.Infrastructure.Types;
 using Nssol.Platypus.Logic.Interfaces;
+using Nssol.Platypus.Models;
 using Nssol.Platypus.Models.TenantModels;
 using System;
 using System.Threading.Tasks;
 
 namespace Nssol.Platypus.Logic
 {
+    /// <summary>
+    /// 学習ロジッククラス
+    /// </summary>
+    /// <seealso cref="Nssol.Platypus.Logic.Interfaces.ITrainingLogic" />
     public class TrainingLogic : PlatypusLogicBase, ITrainingLogic
     {
         private readonly ITrainingHistoryRepository trainingHistoryRepository;
         private readonly ITensorBoardContainerRepository tensorBoardContainerRepository;
+        private readonly IClusterRepository clusterRepository;
         private readonly IClusterManagementLogic clusterManagementLogic;
         private readonly IUnitOfWork unitOfWork;
 
+        /// <summary>
+        /// コンストラクタ
+        /// </summary>
         public TrainingLogic(
             ITrainingHistoryRepository trainingHistoryRepository,
             ITensorBoardContainerRepository tensorBoardContainerRepository,
+            IClusterRepository clusterRepository,
             IClusterManagementLogic clusterManagementLogic,
             IUnitOfWork unitOfWork,
             ICommonDiLogic commonDiLogic) : base(commonDiLogic)
         {
             this.trainingHistoryRepository = trainingHistoryRepository;
             this.tensorBoardContainerRepository = tensorBoardContainerRepository;
+            this.clusterRepository = clusterRepository;
             this.clusterManagementLogic = clusterManagementLogic;
             this.unitOfWork = unitOfWork;
         }
@@ -40,7 +52,13 @@ namespace Nssol.Platypus.Logic
             // コンテナの生存確認
             if (trainingHistory.GetStatus().Exist())
             {
-                var info = await clusterManagementLogic.GetContainerDetailsInfoAsync(trainingHistory.Key, CurrentUserInfo.SelectedTenant.Name, force);
+                Cluster cluster = null;
+                if (trainingHistory.ClusterId.HasValue)
+                {
+                    cluster = await clusterRepository.GetByIdAsync(trainingHistory.ClusterId.Value);
+                }
+
+                var info = await clusterManagementLogic.GetContainerDetailsInfoAsync(trainingHistory.Key, CurrentUserInfo.SelectedTenant.Name, cluster, force);
 
                 // コンテナ削除の前に、DBの更新を先に実行
                 await trainingHistoryRepository.UpdateStatusAsync(trainingHistory.Id, status, info.CreatedAt, DateTime.Now, force);
@@ -52,7 +70,7 @@ namespace Nssol.Platypus.Logic
                 {
                     // 再確認してもまだ存在していたら、コンテナ削除
                     await clusterManagementLogic.DeleteContainerAsync(
-                        ContainerType.Training, trainingHistory.Key, CurrentUserInfo.SelectedTenant.Name, force);
+                        ContainerType.Training, trainingHistory.Key, CurrentUserInfo.SelectedTenant.Name, cluster, force);
                 }
             }
             else
@@ -72,7 +90,7 @@ namespace Nssol.Platypus.Logic
         public async Task DeleteTensorBoardAsync(TensorBoardContainer container, bool force)
         {
             //TensorBoardコンテナを削除する。
-            await clusterManagementLogic.DeleteContainerAsync(ContainerType.TensorBoard, container.Name, CurrentUserInfo.SelectedTenant.Name, force);
+            await clusterManagementLogic.DeleteContainerAsync(ContainerType.TensorBoard, container.Name, CurrentUserInfo.SelectedTenant.Name, null, force);
 
             //結果に関わらず、DBからコンテナ情報を消す
             tensorBoardContainerRepository.Delete(container, force);

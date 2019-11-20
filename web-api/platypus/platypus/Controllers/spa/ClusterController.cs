@@ -76,16 +76,17 @@ namespace Nssol.Platypus.Controllers.spa
                 return JsonNotFound($"Cluster Id {id.Value} is not found.");
             }
 
-            var model = new DetailsOutputModel(cluster);
-
-            // アクセス可能なテナント情報を取得する
-            model.AssignedTenants = clusterRepository.GetAssignedTenants(cluster.Id).Select(t => new DetailsOutputModel.AssignedTenant()
+            var model = new DetailsOutputModel(cluster)
             {
-                Id = t.Id,
-                Name = t.Name,
-                DisplayName = t.DisplayName
-            });
-            
+                // アクセス可能なテナント情報を取得する
+                AssignedTenants = clusterRepository.GetAssignedTenants(cluster.Id).Select(t => new DetailsOutputModel.AssignedTenant()
+                {
+                    Id = t.Id,
+                    Name = t.Name,
+                    DisplayName = t.DisplayName
+                })
+            };
+
             return JsonOK(model);
         }
 
@@ -97,7 +98,7 @@ namespace Nssol.Platypus.Controllers.spa
         [HttpPost("/api/v1/admin/cluster")]
         [PermissionFilter(MenuCode.Cluster)]
         [ProducesResponseType(typeof(IndexOutputModel), (int)HttpStatusCode.Created)]
-        public IActionResult Create([FromBody]CreateInputModel model,
+        public async Task<IActionResult> Create([FromBody]CreateInputModel model,
             [FromServices] ITenantRepository tenantRepository)
         {
             // データの入力チェック
@@ -108,8 +109,9 @@ namespace Nssol.Platypus.Controllers.spa
 
             var cluster = new Cluster()
             {
-                HostName = model.HostName,
                 DisplayName = model.DisplayName,
+                HostName = model.HostName,
+                PortNo = model.PortNo,
                 ResourceManageKey = model.ResourceManageKey,
                 Memo = model.Memo
             };
@@ -119,10 +121,13 @@ namespace Nssol.Platypus.Controllers.spa
             {
                 foreach (long tenantId in model.AssignedTenantIds)
                 {
-                    if (tenantRepository.Get(tenantId) == null)
+                    var tenant = tenantRepository.Get(tenantId);
+                    if (tenant == null)
                     {
                         return JsonNotFound($"Tenant ID {tenantId} is not found.");
                     }
+                    // コンテナ管理サービスにテナントを登録する
+                    await clusterManagementLogic.RegistTenantAsync(tenant.Name, cluster);
                 }
                 clusterRepository.AssignTenants(cluster, model.AssignedTenantIds, true);
             }
@@ -158,10 +163,19 @@ namespace Nssol.Platypus.Controllers.spa
             }
 
             // ClusterはCLIではなく画面から変更されるので、常にすべての値を入れ替える
-            cluster.HostName = model.HostName;
             cluster.DisplayName = model.DisplayName;
+            cluster.HostName = model.HostName;
+            cluster.PortNo = model.PortNo;
             cluster.ResourceManageKey = model.ResourceManageKey;
             cluster.Memo = model.Memo;
+
+            // アクセス可能なテナント一覧を取得する
+            var tenants = clusterRepository.GetAssignedTenants(cluster.Id);
+            foreach (Tenant tenant in tenants)
+            {
+                // コンテナ管理サービスのテナント情報を削除する
+                await clusterManagementLogic.EraseTenantAsync(tenant.Name, cluster);
+            }
 
             // まずは全てのアサイン情報を削除する
             clusterRepository.ResetAssinedTenants(cluster.Id);
@@ -171,10 +185,13 @@ namespace Nssol.Platypus.Controllers.spa
             {
                 foreach (long tenantId in model.AssignedTenantIds)
                 {
-                    if (tenantRepository.Get(tenantId) == null)
+                    var tenant = tenantRepository.Get(tenantId);
+                    if (tenant == null)
                     {
                         return JsonNotFound($"Tenant ID {tenantId} is not found.");
                     }
+                    // コンテナ管理サービスにテナントを登録する
+                    await clusterManagementLogic.RegistTenantAsync(tenant.Name, cluster);
                 }
                 clusterRepository.AssignTenants(cluster, model.AssignedTenantIds, false);
             }
@@ -203,6 +220,14 @@ namespace Nssol.Platypus.Controllers.spa
             if (cluster == null)
             {
                 return JsonNotFound($"Node ID {id.Value} is not found.");
+            }
+
+            // アクセス可能なテナント一覧を取得する
+            var tenants = clusterRepository.GetAssignedTenants(cluster.Id);
+            foreach (Tenant tenant in tenants)
+            {
+                // コンテナ管理サービスのテナント情報を削除する
+                await clusterManagementLogic.EraseTenantAsync(tenant.Name, cluster);
             }
 
             // 全てのアサイン情報を削除する
@@ -353,7 +378,7 @@ namespace Nssol.Platypus.Controllers.spa
 
             foreach (TensorBoardContainer container in containers)
             {
-                var destroyResult = await clusterManagementLogic.DeleteContainerAsync(ContainerType.TensorBoard, container.Name, container.Tenant.Name, true);
+                var destroyResult = await clusterManagementLogic.DeleteContainerAsync(ContainerType.TensorBoard, container.Name, container.Tenant.Name, null, true);
 
                 //コンテナ削除に成功した場合
                 if (destroyResult)
@@ -410,8 +435,8 @@ namespace Nssol.Platypus.Controllers.spa
             }
 
             var result = string.IsNullOrEmpty(name) ?
-                await clusterManagementLogic.GetEventsAsync(tenant, true) :
-                await clusterManagementLogic.GetEventsAsync(tenant, name, true, false);
+                await clusterManagementLogic.GetEventsAsync(tenant, null, true) :
+                await clusterManagementLogic.GetEventsAsync(tenant, name, null, true, false);
             if (result.IsSuccess)
             {
                 return JsonOK(result.Value);

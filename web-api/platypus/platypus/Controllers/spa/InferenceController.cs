@@ -11,6 +11,7 @@ using Nssol.Platypus.Infrastructure;
 using Nssol.Platypus.Infrastructure.Infos;
 using Nssol.Platypus.Infrastructure.Types;
 using Nssol.Platypus.Logic.Interfaces;
+using Nssol.Platypus.Models;
 using Nssol.Platypus.Models.TenantModels;
 using System.Collections.Generic;
 using System.Linq;
@@ -29,6 +30,7 @@ namespace Nssol.Platypus.Controllers.spa
         private readonly ITrainingHistoryRepository trainingHistoryRepository;
         private readonly IInferenceHistoryRepository inferenceHistoryRepository;
         private readonly IDataSetRepository dataSetRepository;
+        private readonly IClusterRepository clusterRepository;
         private readonly IInferenceLogic inferenceLogic;
         private readonly IStorageLogic storageLogic;
         private readonly IGitLogic gitLogic;
@@ -36,19 +38,21 @@ namespace Nssol.Platypus.Controllers.spa
         private readonly IUnitOfWork unitOfWork;
 
         public InferenceController(
-          ITrainingHistoryRepository trainingHistoryRepository,
-          IInferenceHistoryRepository inferenceHistoryRepository,
-          IDataSetRepository dataSetRepository,
-          IInferenceLogic inferenceLogic,
-          IStorageLogic storageLogic,
-          IGitLogic gitLogic,
-          IClusterManagementLogic clusterManagementLogic,
-          IUnitOfWork unitOfWork,
-          IHttpContextAccessor accessor): base(accessor)
+            ITrainingHistoryRepository trainingHistoryRepository,
+            IInferenceHistoryRepository inferenceHistoryRepository,
+            IDataSetRepository dataSetRepository,
+            IClusterRepository clusterRepository,
+            IInferenceLogic inferenceLogic,
+            IStorageLogic storageLogic,
+            IGitLogic gitLogic,
+            IClusterManagementLogic clusterManagementLogic,
+            IUnitOfWork unitOfWork,
+            IHttpContextAccessor accessor): base(accessor)
         {
             this.trainingHistoryRepository = trainingHistoryRepository;
             this.inferenceHistoryRepository = inferenceHistoryRepository;
             this.dataSetRepository = dataSetRepository;
+            this.clusterRepository = clusterRepository;
             this.inferenceLogic = inferenceLogic;
             this.storageLogic = storageLogic;
             this.gitLogic = gitLogic;
@@ -109,8 +113,15 @@ namespace Nssol.Platypus.Controllers.spa
             var status = history.GetStatus();
             if (status.Exist())
             {
+                // クラスタが設定されている場合、クラスタ情報を取得する
+                Cluster cluster = null;
+                if (history.ClusterId.HasValue)
+                {
+                    cluster = await clusterRepository.GetByIdAsync(history.ClusterId.Value);
+                }
+
                 //推論がまだ進行中の場合、情報を更新する
-                var newStatus = await clusterManagementLogic.GetContainerStatusAsync(history.Key, CurrentUserInfo.SelectedTenant.Name, false);
+                var newStatus = await clusterManagementLogic.GetContainerStatusAsync(history.Key, CurrentUserInfo.SelectedTenant.Name, cluster, false);
 
                 if (status.Key != newStatus.Key)
                 {
@@ -221,7 +232,7 @@ namespace Nssol.Platypus.Controllers.spa
             if (status.Exist())
             {
                 //コンテナがまだ存在している場合、情報を更新する
-                var details = await clusterManagementLogic.GetContainerDetailsInfoAsync(history.Key, CurrentUserInfo.SelectedTenant.Name, false);
+                var details = await clusterManagementLogic.GetContainerDetailsInfoAsync(history.Key, CurrentUserInfo.SelectedTenant.Name, history.Cluster, false);
                 model.Status = details.Status.Name;
                 model.StatusType = details.Status.StatusType;
 
@@ -247,7 +258,7 @@ namespace Nssol.Platypus.Controllers.spa
         [ProducesResponseType(typeof(ContainerEventInfo), (int)HttpStatusCode.OK)]
         public async Task<IActionResult> GetErrorEventAsync(long id)
         {
-            var history = await inferenceHistoryRepository.GetByIdAsync(id);
+            var history = await inferenceHistoryRepository.GetIncludeClusterAsync(id);
             if (history == null)
             {
                 return JsonNotFound($"Inference Id {id} is not found.");
@@ -257,7 +268,7 @@ namespace Nssol.Platypus.Controllers.spa
                 return JsonBadRequest($"A container for Inference Id {id} does not exist.");
             }
 
-            var events = await clusterManagementLogic.GetEventsAsync(CurrentUserInfo.SelectedTenant, history.Key, false, true);
+            var events = await clusterManagementLogic.GetEventsAsync(CurrentUserInfo.SelectedTenant, history.Key, history.Cluster, false, true);
 
             if (events.IsSuccess == false)
             {
@@ -694,26 +705,25 @@ namespace Nssol.Platypus.Controllers.spa
                 return JsonBadRequest("Invalid inputs.");
             }
             //データの存在チェック
-            var inferenceHistory = await inferenceHistoryRepository.GetByIdAsync(id.Value);
+            var inferenceHistory = await inferenceHistoryRepository.GetIncludeClusterAsync(id.Value);
             if (inferenceHistory == null)
             {
                 return JsonNotFound($"Inference ID {id} is not found.");
             }
 
             //ステータスを確認
-
             var status = inferenceHistory.GetStatus();
             if (status.Exist())
             {
                 //推論がまだ進行中の場合、情報を更新する
-                status = await clusterManagementLogic.GetContainerStatusAsync(inferenceHistory.Key, CurrentUserInfo.SelectedTenant.Name, false);
+                status = await clusterManagementLogic.GetContainerStatusAsync(inferenceHistory.Key, CurrentUserInfo.SelectedTenant.Name, inferenceHistory.Cluster, false);
             }
 
             if (status.Exist())
             {
                 //実行中であれば、コンテナを削除
                 await clusterManagementLogic.DeleteContainerAsync(
-                    ContainerType.Training, inferenceHistory.Key, CurrentUserInfo.SelectedTenant.Name, false);
+                    ContainerType.Training, inferenceHistory.Key, CurrentUserInfo.SelectedTenant.Name, inferenceHistory.Cluster, false);
             }
 
             //添付ファイルがあったらまとめて消す

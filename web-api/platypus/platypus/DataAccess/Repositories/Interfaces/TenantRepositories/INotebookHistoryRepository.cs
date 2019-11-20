@@ -37,6 +37,12 @@ namespace Nssol.Platypus.DataAccess.Repositories.Interfaces.TenantRepositories
         Task<IEnumerable<NotebookHistory>> GetAllIncludeTenantAsNoTrackingAsync();
 
         /// <summary>
+        /// 指定されたノートブック履歴IDのノートブック履歴エンティティ（クラスタを含む）を取得する
+        /// </summary>
+        /// <param name="id">ノートブック履歴ID</param>
+        Task<NotebookHistory> GetIncludeClusterAsync(long id);
+
+        /// <summary>
         /// 検索条件に合致するデータを一件取得する
         /// </summary>
         NotebookHistory Find(Expression<Func<NotebookHistory, bool>> where, bool force);

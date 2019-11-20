@@ -35,6 +35,12 @@ namespace Nssol.Platypus.DataAccess.Repositories.Interfaces.TenantRepositories
         Task<InferenceHistory> GetIncludeAllAsync(long id);
 
         /// <summary>
+        /// 指定された推論履歴IDの学習履歴エンティティ（クラスタを含む）を取得します。
+        /// </summary>
+        /// <param name="id">推論履歴ID</param>
+        Task<InferenceHistory> GetIncludeClusterAsync(long id);
+
+        /// <summary>
         /// データセットIDに紐づく推論履歴が存在するかチェックします。
         /// </summary>
         /// <param name="datasetId">データセットID</param>

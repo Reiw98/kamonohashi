@@ -67,6 +67,17 @@ namespace Nssol.Platypus.DataAccess.Repositories.TenantRepositories
         }
 
         /// <summary>
+        /// 指定された学習履歴IDの学習履歴エンティティ（クラスタを含む）を取得します。
+        /// </summary>
+        /// <param name="id">学習履歴ID</param>
+        public async Task<TrainingHistory> GetIncludeClusterAsync(long id)
+        {
+            return await FindAll(t => t.Id == id)
+                .Include(t => t.Cluster)
+                .SingleOrDefaultAsync();
+        }
+
+        /// <summary>
         /// データセットIDに紐づく学習履歴が存在するかチェックします。
         /// </summary>
         /// <param name="datasetId">データセットID</param>

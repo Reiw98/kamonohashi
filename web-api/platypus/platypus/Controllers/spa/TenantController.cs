@@ -24,6 +24,7 @@ namespace Nssol.Platypus.Controllers.spa
         private readonly IRoleRepository roleRepository;
         private readonly IRegistryRepository registryRepository;
         private readonly IGitRepository gitRepository;
+        private readonly IClusterRepository clusterRepository;
         private readonly ICommonDiLogic commonDiLogic;
         private readonly IStorageLogic storageLogic;
         private readonly IClusterManagementLogic clusterManagementLogic;
@@ -35,6 +36,7 @@ namespace Nssol.Platypus.Controllers.spa
             IRoleRepository roleRepository,
             IRegistryRepository registryRepository,
             IGitRepository gitRepository,
+            IClusterRepository clusterRepository,
             ICommonDiLogic commonDiLogic,
             IStorageLogic storageLogic,
             IClusterManagementLogic clusterManagementLogic,
@@ -46,6 +48,7 @@ namespace Nssol.Platypus.Controllers.spa
             this.roleRepository = roleRepository;
             this.registryRepository = registryRepository;
             this.gitRepository = gitRepository;
+            this.clusterRepository = clusterRepository;
             this.commonDiLogic = commonDiLogic;
             this.storageLogic = storageLogic;
             this.clusterManagementLogic = clusterManagementLogic;
@@ -186,7 +189,7 @@ namespace Nssol.Platypus.Controllers.spa
 
             //コンテナ管理サービス作業
             //テナントを登録
-            var tenantResult = await clusterManagementLogic.RegistTenantAsync(tenant.Name);
+            var tenantResult = await clusterManagementLogic.RegistTenantAsync(tenant.Name, null);
             if (tenantResult == false)
             {
                 return JsonError(HttpStatusCode.ServiceUnavailable, "Couldn't create cluster master namespace. Please check the configuration to the connect cluster manager service.");
@@ -225,23 +228,29 @@ namespace Nssol.Platypus.Controllers.spa
             // 自分自身の接続中のテナントが対象なら削除不可
             if (CurrentUserInfo.SelectedTenant.Id == id)
                 return JsonConflict($"Illegal state: CurrentUserInfo.SelectedTenant.Id is [{id}].");
-            // 削除対象のテナントでコンテナ稼働中の場合は削除しない
-            var containers = await clusterManagementLogic.GetAllContainerDetailsInfosAsync();
-            if (!containers.IsSuccess)
-                JsonError(HttpStatusCode.ServiceUnavailable, $"ClusterManagementLogic#GetAllContainerDetailsInfosAsync() retusns error. tenantName=[{tenant.Name}]");
-            else if (containers.Value.Count() > 0)
-            {
-                var runningCount = 0; // Where().Count() で個数を一括取得できるが、ステータスを確認するかもしれないので foreach 文とした。
-                foreach (var c in containers.Value)
-                {
-                    // ステータスによらず、全て稼働中と見做す
-                    if (c.TenantName.Equals(tenant.Name))
-                        runningCount += 1;
-                }
 
-                if (runningCount > 0)
-                    return JsonConflict($"Running containers exists deleting tenant. tenant name=[{tenant.Name}], running container count=[{runningCount}]");
-                containers.Value.Where(x => x.TenantName.Equals(tenant.Name));
+            List<Cluster> clusters = clusterRepository.GetAccessibleClusters(CurrentUserInfo.SelectedTenant.Id).ToList();
+            clusters.Add(null); // オンプレ環境はnullを設定
+            foreach (Cluster cluster in clusters)
+            {
+                // 削除対象のテナントでコンテナ稼働中の場合は削除しない
+                var containers = await clusterManagementLogic.GetAllContainerDetailsInfosAsync(cluster);
+                if (!containers.IsSuccess)
+                    JsonError(HttpStatusCode.ServiceUnavailable, $"ClusterManagementLogic#GetAllContainerDetailsInfosAsync() retusns error. tenantName=[{tenant.Name}]");
+                else if (containers.Value.Count() > 0)
+                {
+                    var runningCount = 0; // Where().Count() で個数を一括取得できるが、ステータスを確認するかもしれないので foreach 文とした。
+                    foreach (var c in containers.Value)
+                    {
+                        // ステータスによらず、全て稼働中と見做す
+                        if (c.TenantName.Equals(tenant.Name))
+                            runningCount += 1;
+                    }
+
+                    if (runningCount > 0)
+                        return JsonConflict($"Running containers exists deleting tenant. tenant name=[{tenant.Name}], running container count=[{runningCount}]");
+                    containers.Value.Where(x => x.TenantName.Equals(tenant.Name));
+                }
             }
 
             // 削除対象のテナントを所有するユーザ・リストを獲得
@@ -300,13 +309,16 @@ namespace Nssol.Platypus.Controllers.spa
             }
 
             // k8s の名前空間の抹消(削除)
-            var k8sResult = await clusterManagementLogic.EraseTenantAsync(tenant.Name);
-            if (!k8sResult)
+            foreach (Cluster cluster in clusters)
             {
-                // 削除に失敗したならメッセージを警告として格納し処理の中断は行わない
-                var msg = $"Couldn't delete cluster master namespace [{tenant.Name}]. Please check the configuration to the connect cluster manager service.";
-                LogWarning(msg);
-                result.KubernetesWarnMsg = msg;
+                var k8sResult = await clusterManagementLogic.EraseTenantAsync(tenant.Name, cluster);
+                if (!k8sResult)
+                {
+                    // 削除に失敗したならメッセージを警告として格納し処理の中断は行わない
+                    var msg = $"Couldn't delete cluster [{cluster.ServiceBaseUrl}] master namespace [{tenant.Name}]. Please check the configuration to the connect cluster manager service.";
+                    LogWarning(msg);
+                    result.KubernetesWarnMsg += msg;
+                }
             }
 
             // テナントの削除（関連するDBのエントリも自動削除）
@@ -369,7 +381,7 @@ namespace Nssol.Platypus.Controllers.spa
 
             //コンテナ管理サービス作業
             //テナントを登録
-            var tenantResult = await clusterManagementLogic.RegistTenantAsync(tenant.Name);
+            var tenantResult = await clusterManagementLogic.RegistTenantAsync(tenant.Name, null); // TODO:クラスタ情報をどうするか？
             if (tenantResult == false)
             {
                 return JsonError(HttpStatusCode.ServiceUnavailable, "Couldn't create cluster master namespace. Please check the configuration to the connect cluster manager service.");

@@ -102,7 +102,7 @@ namespace Nssol.Platypus.Logic.HostedService
                 foreach (Tenant tenant in tenants)
                 {
                     // 名前空間とロールを同期
-                    bool ret = clusterManagementService.RegistTenantAsync(tenant.Name).Result;
+                    bool ret = clusterManagementService.RegistTenantAsync(tenant.Name, containerManageOptions.ContainerServiceBaseUrl, containerManageOptions.ResourceManageKey).Result; // TODO:クラスタ情報をどうするか？
                     if (ret)
                     {
                         LogDebug($"DB のテナント \"{tenant.Name}\" に対応する名前空間とロールを Cluster(k8s) へ同期させました。");

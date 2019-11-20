@@ -34,8 +34,9 @@ namespace Nssol.Platypus.Migrations
                     CreatedAt = table.Column<DateTime>(nullable: false),
                     ModifiedBy = table.Column<string>(nullable: false),
                     ModifiedAt = table.Column<DateTime>(nullable: false),
-                    HostName = table.Column<string>(nullable: false),
                     DisplayName = table.Column<string>(nullable: false),
+                    HostName = table.Column<string>(nullable: false),
+                    PortNo = table.Column<int>(nullable: false),
                     ResourceManageKey = table.Column<string>(nullable: false),
                     Memo = table.Column<string>(nullable: true)
                 },

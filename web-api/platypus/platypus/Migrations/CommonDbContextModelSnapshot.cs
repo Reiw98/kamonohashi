@@ -42,6 +42,8 @@ namespace Nssol.Platypus.Migrations
                     b.Property<string>("ModifiedBy")
                         .IsRequired();
 
+                    b.Property<int>("PortNo");
+
                     b.Property<string>("ResourceManageKey")
                         .IsRequired();
 

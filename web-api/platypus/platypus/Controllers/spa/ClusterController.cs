@@ -162,13 +162,6 @@ namespace Nssol.Platypus.Controllers.spa
                 return JsonNotFound($"Cluster ID {id.Value} is not found.");
             }
 
-            // ClusterはCLIではなく画面から変更されるので、常にすべての値を入れ替える
-            cluster.DisplayName = model.DisplayName;
-            cluster.HostName = model.HostName;
-            cluster.PortNo = model.PortNo;
-            cluster.ResourceManageKey = model.ResourceManageKey;
-            cluster.Memo = model.Memo;
-
             // アクセス可能なテナント一覧を取得する
             var tenants = clusterRepository.GetAssignedTenants(cluster.Id);
             foreach (Tenant tenant in tenants)
@@ -176,6 +169,13 @@ namespace Nssol.Platypus.Controllers.spa
                 // コンテナ管理サービスのテナント情報を削除する
                 await clusterManagementLogic.EraseTenantAsync(tenant.Name, cluster);
             }
+
+            // ClusterはCLIではなく画面から変更されるので、常にすべての値を入れ替える
+            cluster.DisplayName = model.DisplayName;
+            cluster.HostName = model.HostName;
+            cluster.PortNo = model.PortNo;
+            cluster.ResourceManageKey = model.ResourceManageKey;
+            cluster.Memo = model.Memo;
 
             // まずは全てのアサイン情報を削除する
             clusterRepository.ResetAssinedTenants(cluster.Id);

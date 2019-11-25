@@ -5,8 +5,8 @@ using Nssol.Platypus.DataAccess.Repositories.Interfaces.TenantRepositories;
 using Nssol.Platypus.Infrastructure;
 using Nssol.Platypus.Infrastructure.Options;
 using Nssol.Platypus.Infrastructure.Types;
+using Nssol.Platypus.Logic.Interfaces;
 using Nssol.Platypus.Models.TenantModels;
-using Nssol.Platypus.Services.Interfaces;
 using System;
 using System.Linq;
 
@@ -19,7 +19,7 @@ namespace Nssol.Platypus.Logic.HostedService
     {
         // DI で注入されるオブジェクト類
         private readonly INotebookHistoryRepository notebookHistoryRepository;
-        private readonly IClusterManagementService clusterManagementService;
+        private readonly IClusterManagementLogic clusterManagementLogic;
         private readonly IUnitOfWork unitOfWork;
 
         /// <summary>
@@ -28,16 +28,16 @@ namespace Nssol.Platypus.Logic.HostedService
         private readonly string kubernetesToken;
 
         /// <summary>
-        /// コンテナ管理サービスのベースURL (環境変数、または launchSettings.json で設定)
+        /// kubernetes のベースURL (環境変数、または launchSettings.json で設定)
         /// </summary>
-        private readonly string containerServiceBaseUrl;
+        private readonly string kubernetesUrl;
 
         /// <summary>
         /// コンストラクタで各 DI オブジェクトを引数で受け取ります。
         /// </summary>
         public DeleteNotebookContainerTimer(
             INotebookHistoryRepository notebookHistoryRepository,
-            IClusterManagementService clusterManagementService,
+            IClusterManagementLogic clusterManagementLogic,
             IUnitOfWork unitOfWork,
             IOptions<ContainerManageOptions> containerManageOptions,
             IOptions<DeleteNotebookContainerTimerOptions> deleteNotebookContainerTimerOptions,
@@ -46,13 +46,13 @@ namespace Nssol.Platypus.Logic.HostedService
         {
             // 各 DI オブジェクトの設定
             this.notebookHistoryRepository = notebookHistoryRepository;
-            this.clusterManagementService = clusterManagementService;
+            this.clusterManagementLogic = clusterManagementLogic;
             this.unitOfWork = unitOfWork;
 
             // kubernetes の token
             this.kubernetesToken = containerManageOptions.Value.ResourceManageKey;
-            // コンテナ管理サービスのベースURL
-            this.containerServiceBaseUrl = containerManageOptions.Value.ContainerServiceBaseUrl;
+            // kubernetes のベースURL
+            this.kubernetesUrl = containerManageOptions.Value.ContainerServiceBaseUrl;
         }
 
         /// <summary>
@@ -62,6 +62,12 @@ namespace Nssol.Platypus.Logic.HostedService
         protected override bool isValid()
         {
             bool ret = true;
+            if (string.IsNullOrEmpty(kubernetesUrl))
+            {
+                LogError("kubernetes のURLが設定されていません。");
+                ret = false;
+            }
+
             if (string.IsNullOrEmpty(kubernetesToken))
             {
                 LogError("kubernetes のトークンが設定されていません。");
@@ -92,11 +98,8 @@ namespace Nssol.Platypus.Logic.HostedService
                 var deleteContainerCount = 0;
                 foreach (NotebookHistory notebookHistory in notebookHistories)
                 {
-                    string containerServiceUrl = notebookHistory.ClusterId.HasValue ? notebookHistory.Cluster.ServiceBaseUrl : containerServiceBaseUrl;
-                    string token = notebookHistory.ClusterId.HasValue ? notebookHistory.Cluster.ResourceManageKey : kubernetesToken;
-
                     // 実コンテナのステータス情報を取得する
-                    var newStatus = clusterManagementService.GetContainerStatusAsync(notebookHistory.Key, notebookHistory.Tenant.Name, containerServiceUrl, token).Result;
+                    var newStatus = clusterManagementLogic.GetContainerStatusAsync(notebookHistory.Key, notebookHistory.Tenant.Name, notebookHistory.Cluster, true).Result;
                     if (notebookHistory.GetStatus().Key != newStatus.Key)
                     {
                         // ステータス更新があったので、変更処理
@@ -118,7 +121,7 @@ namespace Nssol.Platypus.Logic.HostedService
                             try
                             {
                                 // kubernetes 上の実コンテナを削除する
-                                var destroyResult = clusterManagementService.DeleteContainerAsync(ContainerType.Notebook, notebookHistory.Key, notebookHistory.Tenant.Name, containerServiceUrl, token).Result;
+                                var destroyResult = clusterManagementLogic.DeleteContainerAsync(ContainerType.Notebook, notebookHistory.Key, notebookHistory.Tenant.Name, notebookHistory.Cluster, true).Result;
                                 if (destroyResult)
                                 {
                                     // 実際に削除対応したならカウントアップ

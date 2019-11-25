@@ -27,9 +27,9 @@ namespace Nssol.Platypus.Logic.HostedService
         private readonly string kubernetesToken;
 
         /// <summary>
-        /// コンテナ管理サービスのベースURL (環境変数、または launchSettings.json で設定)
+        /// kubernetes のベースURL (環境変数、または launchSettings.json で設定)
         /// </summary>
-        private readonly string containerServiceBaseUrl;
+        private readonly string kubernetesUrl;
 
         /// <summary>
         /// コンストラクタで各 DI オブジェクトを引数で受け取ります。
@@ -50,8 +50,8 @@ namespace Nssol.Platypus.Logic.HostedService
 
             // kubernetes の token
             this.kubernetesToken = containerManageOptions.Value.ResourceManageKey;
-            // コンテナ管理サービスのベースURL
-            this.containerServiceBaseUrl = containerManageOptions.Value.ContainerServiceBaseUrl;
+            // kubernetes のベースURL
+            this.kubernetesUrl = containerManageOptions.Value.ContainerServiceBaseUrl;
         }
 
         /// <summary>
@@ -61,6 +61,12 @@ namespace Nssol.Platypus.Logic.HostedService
         protected override bool isValid()
         {
             bool ret = true;
+            if (string.IsNullOrEmpty(kubernetesUrl))
+            {
+                LogError("kubernetes のURLが設定されていません。");
+                ret = false;
+            }
+
             if (string.IsNullOrEmpty(kubernetesToken))
             {
                 LogError("kubernetes のトークンが設定されていません。");

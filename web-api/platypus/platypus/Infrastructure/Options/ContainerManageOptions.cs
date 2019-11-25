@@ -19,6 +19,16 @@ namespace Nssol.Platypus.Infrastructure.Options
             }
         }
         /// <summary>
+        /// クラスタサービス(e.g. k8s)のWSSのURI
+        /// </summary>
+        public string ContainerServiceWssUri
+        {
+            get
+            {
+                return $"wss://{ KubernetesHostName }:{ KubernetesPort }";
+            }
+        }
+        /// <summary>
         /// k8sのホスト名
         /// </summary>
         public string KubernetesHostName { get; set; }

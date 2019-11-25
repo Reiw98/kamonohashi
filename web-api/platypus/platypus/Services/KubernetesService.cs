@@ -801,7 +801,7 @@ namespace Nssol.Platypus.Services
         /// <remarks>
         /// API としては async だが、内部ではコマンド実行結果を待つために wait している
         /// </remarks>
-        public async Task<bool> ExecBashCommandAsync(string tenantName, string podName, string command, string container, string token, int intervalMillisec, int maxLoopCount)
+        public async Task<bool> ExecBashCommandAsync(string tenantName, string podName, string command, string container, string containerServiceBaseUrl, string kubernetesUri, string token, int intervalMillisec, int maxLoopCount)
         {
             // コマンドに stderr=true&stdout=true を付加し、実行結果をハンドリングする
             // bash -c command : おそらく環境変数などを引き継ぎできるので bash -c とするのが良いと思う。
@@ -811,11 +811,6 @@ namespace Nssol.Platypus.Services
                 //
                 // ClientWebSocket 経由でコマンドを実行するための環境設定
                 //
-
-                // wss プロトコルで接続
-                string k8sHost = containerOptions.KubernetesHostName;
-                string k8sPort = containerOptions.KubernetesPort;
-                string kubernetesUri = "wss://" + k8sHost + ":" + k8sPort;
 
                 // kubernetes のトークン設定
                 ClientWebSocket kubernetesWebSocket = new ClientWebSocket();
@@ -1914,8 +1909,9 @@ namespace Nssol.Platypus.Services
         /// <param name="jobName">ジョブ名</param>
         /// <param name="tenantName">テナント名</param>
         /// <param name="containerServiceBaseUrl">コンテナサービスのベースURL</param>
+        /// <param name="kubernetesUri">kubernetesのWSSのURI</param>
         /// <param name="token">要求をしたユーザの認証トークン</param>
-        public async Task<Result<ClientWebSocket, ContainerStatus>> ConnectWebSocketAsync(string jobName, string tenantName, string containerServiceBaseUrl, string token)
+        public async Task<Result<ClientWebSocket, ContainerStatus>> ConnectWebSocketAsync(string jobName, string tenantName, string containerServiceBaseUrl, string kubernetesUri, string token)
         {
             //// ジョブに対応するポッドが存在する場合のみ、websocketを確立
             var result = await GetPodForJobAsync(jobName, tenantName, containerServiceBaseUrl, token);
@@ -1923,9 +1919,6 @@ namespace Nssol.Platypus.Services
                 return Result<ClientWebSocket, ContainerStatus>.CreateErrorResult(result.Error);
 
             string podName = result.Value.Metadata.Name;
-            string k8sHost = containerOptions.KubernetesHostName;
-            string k8sPort = containerOptions.KubernetesPort;
-            string kubernetesUri = "wss://" + k8sHost + ":" + k8sPort; 
             string apiUri = "/api/v1/namespaces/" + tenantName + "/pods/" + podName + "/exec?command=/bin/bash&stdin=true&stderr=true&stdout=true&tty=true&container=main";
 
             ClientWebSocket kubernetesWebSocket = new ClientWebSocket();

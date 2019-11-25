@@ -103,7 +103,7 @@ namespace Nssol.Platypus.Services.Interfaces
         /// 指定したテナントの Pod 上でコマンドを実行する。
         /// 実行コンテナ名と、コマンド実行終了を確認する最大回数 maxLoopCount やその間隔 intervalMillisec も指定する。
         /// </summary>
-        Task<bool> ExecBashCommandAsync(string tenantName, string podName, string command, string container, string token, int intervalMillisec, int maxLoopCount);
+        Task<bool> ExecBashCommandAsync(string tenantName, string podName, string command, string container, string containerServiceBaseUrl, string kubernetesUri, string token, int intervalMillisec, int maxLoopCount);
         #endregion
 
         #region クラスタ管理
@@ -196,8 +196,9 @@ namespace Nssol.Platypus.Services.Interfaces
         /// <param name="jobName">ジョブ名</param>
         /// <param name="tenantName">テナント名</param>
         /// <param name="containerServiceBaseUrl">コンテナサービスのベースURL</param>
+        /// <param name="kubernetesUri">kubernetesのWSSのURI</param>
         /// <param name="token">要求をしたユーザの認証トークン</param>
-        Task<Result<ClientWebSocket, ContainerStatus>> ConnectWebSocketAsync(string jobName, string tenantName, string containerServiceBaseUrl, string token);
+        Task<Result<ClientWebSocket, ContainerStatus>> ConnectWebSocketAsync(string jobName, string tenantName, string containerServiceBaseUrl, string kubernetesUri, string token);
         #endregion
     }
 }

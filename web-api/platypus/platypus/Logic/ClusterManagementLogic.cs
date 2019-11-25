@@ -1400,17 +1400,18 @@ namespace Nssol.Platypus.Logic
             // ブラウザとのWebSocket接続を確立
             WebSocket browserWebSocket = await context.WebSockets.AcceptWebSocketAsync();
 
-
             // リクエストから、job名、tenant名を取得
             string jobName = context.Request.Query["jobName"];
             string tenantName = context.Request.Query["tenantName"];
 
-            var containerOptions = CommonDiLogic.DynamicDi<IOptions<ContainerManageOptions>>();
-            var token = containerOptions.Value.ResourceManageKey;   // 全テナントにアクセス可能な状態。CurrentUserInfoがnullであるため(Claim情報が無いため)、GetUserAccessTokenAsync()が使えない
+            Cluster cluster = GetClusterInfo(jobName);
+            string token = cluster.ResourceManageKey;
+            string containerServiceBaseUrl = cluster.ServiceBaseUrl;
+            string kubernetesUri = cluster.WssUri;
 
             // KubernetesとのWebSocket接続を確立
             var kubernetesService = CommonDiLogic.DynamicDi<Services.Interfaces.IClusterManagementService>();
-            var result = await kubernetesService.ConnectWebSocketAsync(jobName, tenantName, null, token); // TODO:クラスタ毎に接続先が変わるのか？
+            var result = await kubernetesService.ConnectWebSocketAsync(jobName, tenantName, containerServiceBaseUrl, kubernetesUri, token);
 
             // 確立に失敗した場合は、ブラウザとの接続を切断
             if (result.Error != null)
@@ -1484,6 +1485,54 @@ namespace Nssol.Platypus.Logic
             // Kubernetesとの接続が切れた場合(ジョブが終了した場合等)
             await kubernetesWebSocket.CloseOutputAsync(kubernetesWebSocket.CloseStatus.Value, kubernetesWebSocket.CloseStatusDescription, CancellationToken.None);
             await browserWebSocket.CloseOutputAsync(kubernetesWebSocket.CloseStatus.Value, kubernetesWebSocket.CloseStatusDescription, CancellationToken.None);
+        }
+
+        /// <summary>
+        /// ジョブ名から指定クラスタ情報を取得する。
+        /// </summary>
+        private Cluster GetClusterInfo(string jobName)
+        {
+            // デフォルトのクラスタ情報を設定
+            Cluster cluster = new Cluster()
+            {
+                HostName = containerOptions.KubernetesHostName,
+                PortNo = int.Parse(containerOptions.KubernetesPort),
+                ResourceManageKey = containerOptions.ResourceManageKey,   // 全テナントにアクセス可能な状態。CurrentUserInfoがnullであるため(Claim情報が無いため)、GetUserAccessTokenAsync()が使えない
+            };
+
+            // ジョブ名からIDを取得する
+            long id = long.Parse(jobName.Substring(jobName.IndexOf('-') + 1));
+
+            // prefixだけでコンテナ種別を判断する
+            if (jobName.StartsWith("training"))
+            {
+                // 学習コンテナ
+                var container = CommonDiLogic.DynamicDi<ITrainingHistoryRepository>().Find(t => t.Key == jobName, true);
+                if (container.ClusterId.HasValue)
+                {
+                    cluster = clusterRepository.GetByIdAsync(container.ClusterId.Value).Result;
+                }
+            }
+            else if (jobName.StartsWith("inference"))
+            {
+                // 推論コンテナ
+                var container = CommonDiLogic.DynamicDi<IInferenceHistoryRepository>().Find(t => t.Key == jobName, true);
+                if (container.ClusterId.HasValue)
+                {
+                    cluster = clusterRepository.GetByIdAsync(container.ClusterId.Value).Result;
+                }
+            }
+            else if (jobName.StartsWith("notebook"))
+            {
+                // ノートブックコンテナ
+                var container = CommonDiLogic.DynamicDi<INotebookHistoryRepository>().Find(t => t.Key == jobName, true);
+                if (container.ClusterId.HasValue)
+                {
+                    cluster = clusterRepository.GetByIdAsync(container.ClusterId.Value).Result;
+                }
+            }
+
+            return cluster;
         }
         #endregion
     }

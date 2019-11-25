@@ -19,6 +19,16 @@ namespace Nssol.Platypus.Logic.HostedService
         private readonly IClusterManagementService clusterManagementService;
 
         /// <summary>
+        /// kubernetes の URL (環境変数、または launchSettings.json で設定)
+        /// </summary>
+        private readonly string kubernetesUrl;
+
+        /// <summary>
+        /// kubernetes の WSS URL (環境変数、または launchSettings.json で設定)
+        /// </summary>
+        private readonly string kubernetesWssUri;
+
+        /// <summary>
         /// kubernetes の token (環境変数、または launchSettings.json で設定)
         /// </summary>
         private readonly string kubernetesToken;
@@ -85,6 +95,10 @@ namespace Nssol.Platypus.Logic.HostedService
         {
             // kubernetes による cluster 管理サービス
             this.clusterManagementService = clusterManagementService;
+            // kubernetes の URL
+            this.kubernetesUrl = containerManageOptions.Value.ContainerServiceBaseUrl;
+            // kubernetes の WSS URI
+            this.kubernetesWssUri = containerManageOptions.Value.ContainerServiceWssUri;
             // kubernetes の token
             this.kubernetesToken = containerManageOptions.Value.ResourceManageKey;
 
@@ -108,6 +122,11 @@ namespace Nssol.Platypus.Logic.HostedService
         protected override bool isValid()
         {
             bool ret = true;
+            if (string.IsNullOrEmpty(kubernetesUrl))
+            {
+                LogError("kubernetes のURLが設定されていません。");
+                ret = false;
+            }
             if (string.IsNullOrEmpty(kubernetesToken))
             {
                 LogError("kubernetes のトークンが設定されていません。");
@@ -150,7 +169,7 @@ namespace Nssol.Platypus.Logic.HostedService
             try
             {
                 // Pod 名の取得
-                var resultPod = clusterManagementService.GetPodNameAsync(systemNamespace, APP_NAME, LIMIT, null, kubernetesToken).Result;
+                var resultPod = clusterManagementService.GetPodNameAsync(systemNamespace, APP_NAME, LIMIT, kubernetesUrl, kubernetesToken).Result;
                 if (!resultPod.IsSuccess)
                 {
                     LogError($"Pod 名を取得できませんでしたので Postgres バックアップ処理は中断します。 namespace=\"{systemNamespace}\", appName=\"{APP_NAME}\"");
@@ -161,7 +180,7 @@ namespace Nssol.Platypus.Logic.HostedService
                 string yyymmdd = getTodayString("yyyyMMdd");
                 string fileName = $"{backupFileBodyName}-{yyymmdd}.sql";
                 string command = $"pg_dumpall -U {dbUser} -l {dbName} > {backupSavedPath}/{fileName}";
-                var resultExec = clusterManagementService.ExecBashCommandAsync(systemNamespace, resultPod.Value, HttpUtility.UrlEncode(command), APP_NAME, kubernetesToken, SLEEP_MILLISEC, MAX_LOOP_COUNT).Result;
+                var resultExec = clusterManagementService.ExecBashCommandAsync(systemNamespace, resultPod.Value, HttpUtility.UrlEncode(command), APP_NAME, kubernetesUrl, kubernetesWssUri, kubernetesToken, SLEEP_MILLISEC, MAX_LOOP_COUNT).Result;
                 if (!resultExec)
                 {
                     LogError($"Postgres のバックアップに失敗しました。command=\"{command}\"");
@@ -180,7 +199,7 @@ namespace Nssol.Platypus.Logic.HostedService
                 // 最大個数以上のバックアップが存在しているなら、日付サフィックスの若い順に削除
                 // ref: https://hogashi.hatenablog.com/entry/2016/03/25/050613
                 command = $"rm `ls -1v {backupSavedPath}/{backupFileBodyName}-*.sql | head -n-{maxNumberOfBackupFiles}`";
-                resultExec = clusterManagementService.ExecBashCommandAsync(systemNamespace, resultPod.Value, HttpUtility.UrlEncode(command), APP_NAME, kubernetesToken, SLEEP_MILLISEC, MAX_LOOP_COUNT).Result;
+                resultExec = clusterManagementService.ExecBashCommandAsync(systemNamespace, resultPod.Value, HttpUtility.UrlEncode(command), APP_NAME, kubernetesUrl, kubernetesWssUri, kubernetesToken, SLEEP_MILLISEC, MAX_LOOP_COUNT).Result;
                 if (resultExec)
                 {
                     LogInfo($"Postgres バックアップファイルの削除に問題はありませんでした。command=\"{command}\"");

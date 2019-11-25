@@ -99,7 +99,7 @@ namespace Nssol.Platypus.Logic.HostedService
                     try
                     {
                         // kubernetes 上の実コンテナを削除
-                        var destroyResult = clusterManagementService.DeleteContainerAsync(ContainerType.TensorBoard, container.Name, container.Tenant.Name, containerServiceBaseUrl, kubernetesToken).Result;
+                        var destroyResult = clusterManagementService.DeleteContainerAsync(ContainerType.TensorBoard, container.Name, container.Tenant.Name, kubernetesUrl, kubernetesToken).Result;
                         if (destroyResult)
                         {
                             // 実際に対応する削除したならカウントアップ

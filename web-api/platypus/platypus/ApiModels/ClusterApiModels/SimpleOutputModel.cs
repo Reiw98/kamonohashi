@@ -5,9 +5,9 @@ namespace Nssol.Platypus.ApiModels.ClusterApiModels
     /// <summary>
     /// クラスタ情報のうち、コスト最小で取得できる情報だけを保持する
     /// </summary>
-    public class SimpleOutputModel : Components.OutputModelBase
+    public class SimpleOutputModel
     {
-        public SimpleOutputModel(Cluster cluster) : base(cluster)
+        public SimpleOutputModel(Cluster cluster)
         {
             Id = cluster.Id;
             DisplayName = cluster.DisplayName;

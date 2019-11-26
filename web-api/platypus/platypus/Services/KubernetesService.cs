@@ -337,7 +337,7 @@ namespace Nssol.Platypus.Services
                 NfsVolumeMounts = inModel.NfsVolumeMounts,
                 ContainerSharedPath = containerSharedPath,
                 ScriptType = inModel.ScriptType,
-                EnvList = inModel.EnvList,
+                EnvList = inModel.PrepareAndFinishContainerEnvList,
                 LogPath = inModel.LogPath
             });
             string mainContainer = await RenderEngine.CompileRenderAsync("create_container.yaml", new
@@ -351,7 +351,7 @@ namespace Nssol.Platypus.Services
                 NfsVolumeMounts = inModel.NfsVolumeMounts,
                 ContainerSharedPath = containerSharedPath,
                 ScriptType = inModel.ScriptType,
-                EnvList = inModel.EnvList,
+                EnvList = inModel.MainContainerEnvList,
                 LogPath = inModel.LogPath
             });
             string finishContainer = await RenderEngine.CompileRenderAsync("create_container.yaml", new
@@ -365,7 +365,7 @@ namespace Nssol.Platypus.Services
                 NfsVolumeMounts = inModel.NfsVolumeMounts,
                 ContainerSharedPath = containerSharedPath,
                 ScriptType = inModel.ScriptType,
-                EnvList = inModel.EnvList,
+                EnvList = inModel.PrepareAndFinishContainerEnvList,
                 LogPath = inModel.LogPath
             });
 

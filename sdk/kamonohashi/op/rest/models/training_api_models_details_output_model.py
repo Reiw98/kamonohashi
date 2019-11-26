@@ -16,6 +16,7 @@ import re  # noqa: F401
 
 import six
 
+from kamonohashi.op.rest.models.cluster_api_models_simple_output_model import ClusterApiModelsSimpleOutputModel  # noqa: F401,E501
 from kamonohashi.op.rest.models.components_container_image_output_model import ComponentsContainerImageOutputModel  # noqa: F401,E501
 from kamonohashi.op.rest.models.components_git_commit_output_model import ComponentsGitCommitOutputModel  # noqa: F401,E501
 from kamonohashi.op.rest.models.data_set_api_models_index_output_model import DataSetApiModelsIndexOutputModel  # noqa: F401,E501
@@ -37,6 +38,7 @@ class TrainingApiModelsDetailsOutputModel(object):
                             and the value is json key in definition.
     """
     swagger_types = {
+        'cluster': 'ClusterApiModelsSimpleOutputModel',
         'completed_at': 'str',
         'condition_note': 'str',
         'container_image': 'ComponentsContainerImageOutputModel',
@@ -71,6 +73,7 @@ class TrainingApiModelsDetailsOutputModel(object):
     }
 
     attribute_map = {
+        'cluster': 'cluster',
         'completed_at': 'completedAt',
         'condition_note': 'conditionNote',
         'container_image': 'containerImage',
@@ -104,9 +107,10 @@ class TrainingApiModelsDetailsOutputModel(object):
         'zip': 'zip'
     }
 
-    def __init__(self, completed_at=None, condition_note=None, container_image=None, cpu=None, created_at=None, created_by=None, data_set=None, display_id=None, entry_point=None, execution_time=None, favorite=None, full_name=None, git_model=None, gpu=None, id=None, key=None, log_summary=None, memo=None, memory=None, modified_at=None, modified_by=None, name=None, node=None, options=None, parent=None, partition=None, started_at=None, status=None, status_type=None, waiting_time=None, zip=None):  # noqa: E501
+    def __init__(self, cluster=None, completed_at=None, condition_note=None, container_image=None, cpu=None, created_at=None, created_by=None, data_set=None, display_id=None, entry_point=None, execution_time=None, favorite=None, full_name=None, git_model=None, gpu=None, id=None, key=None, log_summary=None, memo=None, memory=None, modified_at=None, modified_by=None, name=None, node=None, options=None, parent=None, partition=None, started_at=None, status=None, status_type=None, waiting_time=None, zip=None):  # noqa: E501
         """TrainingApiModelsDetailsOutputModel - a model defined in Swagger"""  # noqa: E501
 
+        self._cluster = None
         self._completed_at = None
         self._condition_note = None
         self._container_image = None
@@ -140,6 +144,8 @@ class TrainingApiModelsDetailsOutputModel(object):
         self._zip = None
         self.discriminator = None
 
+        if cluster is not None:
+            self.cluster = cluster
         if completed_at is not None:
             self.completed_at = completed_at
         if condition_note is not None:
@@ -202,6 +208,27 @@ class TrainingApiModelsDetailsOutputModel(object):
             self.waiting_time = waiting_time
         if zip is not None:
             self.zip = zip
+
+    @property
+    def cluster(self):
+        """Gets the cluster of this TrainingApiModelsDetailsOutputModel.  # noqa: E501
+
+
+        :return: The cluster of this TrainingApiModelsDetailsOutputModel.  # noqa: E501
+        :rtype: ClusterApiModelsSimpleOutputModel
+        """
+        return self._cluster
+
+    @cluster.setter
+    def cluster(self, cluster):
+        """Sets the cluster of this TrainingApiModelsDetailsOutputModel.
+
+
+        :param cluster: The cluster of this TrainingApiModelsDetailsOutputModel.  # noqa: E501
+        :type: ClusterApiModelsSimpleOutputModel
+        """
+
+        self._cluster = cluster
 
     @property
     def completed_at(self):

@@ -34,6 +34,7 @@ class TrainingApiModelsCreateInputModel(object):
                             and the value is json key in definition.
     """
     swagger_types = {
+        'cluster_id': 'int',
         'container_image': 'ComponentsContainerImageInputModel',
         'cpu': 'int',
         'data_set_id': 'int',
@@ -50,6 +51,7 @@ class TrainingApiModelsCreateInputModel(object):
     }
 
     attribute_map = {
+        'cluster_id': 'clusterId',
         'container_image': 'containerImage',
         'cpu': 'cpu',
         'data_set_id': 'dataSetId',
@@ -65,9 +67,10 @@ class TrainingApiModelsCreateInputModel(object):
         'zip': 'zip'
     }
 
-    def __init__(self, container_image=None, cpu=None, data_set_id=None, entry_point=None, git_model=None, gpu=None, memo=None, memory=None, name=None, options=None, parent_id=None, partition=None, zip=None):  # noqa: E501
+    def __init__(self, cluster_id=None, container_image=None, cpu=None, data_set_id=None, entry_point=None, git_model=None, gpu=None, memo=None, memory=None, name=None, options=None, parent_id=None, partition=None, zip=None):  # noqa: E501
         """TrainingApiModelsCreateInputModel - a model defined in Swagger"""  # noqa: E501
 
+        self._cluster_id = None
         self._container_image = None
         self._cpu = None
         self._data_set_id = None
@@ -83,6 +86,8 @@ class TrainingApiModelsCreateInputModel(object):
         self._zip = None
         self.discriminator = None
 
+        if cluster_id is not None:
+            self.cluster_id = cluster_id
         self.container_image = container_image
         self.cpu = cpu
         self.data_set_id = data_set_id
@@ -101,6 +106,27 @@ class TrainingApiModelsCreateInputModel(object):
             self.partition = partition
         if zip is not None:
             self.zip = zip
+
+    @property
+    def cluster_id(self):
+        """Gets the cluster_id of this TrainingApiModelsCreateInputModel.  # noqa: E501
+
+
+        :return: The cluster_id of this TrainingApiModelsCreateInputModel.  # noqa: E501
+        :rtype: int
+        """
+        return self._cluster_id
+
+    @cluster_id.setter
+    def cluster_id(self, cluster_id):
+        """Sets the cluster_id of this TrainingApiModelsCreateInputModel.
+
+
+        :param cluster_id: The cluster_id of this TrainingApiModelsCreateInputModel.  # noqa: E501
+        :type: int
+        """
+
+        self._cluster_id = cluster_id
 
     @property
     def container_image(self):

@@ -2956,7 +2956,7 @@ export const ApiV1InferencesByIdEventsGetURL = function(parameters = {}) {
  * url: ApiV1InferencesRunPostURL
  * method: ApiV1InferencesRunPost_TYPE
  * raw_url: ApiV1InferencesRunPost_RAW_URL
- * @param model - 
+ * @param model - 新規実行情報
  */
 export const ApiV1InferencesRunPost = function(parameters = {}) {
   const domain = parameters.$domain ? parameters.$domain : getDomain()
@@ -4338,7 +4338,7 @@ export const ApiV1NotebookByIdEndpointGetURL = function(parameters = {}) {
  * url: ApiV1NotebookRunPostURL
  * method: ApiV1NotebookRunPost_TYPE
  * raw_url: ApiV1NotebookRunPost_RAW_URL
- * @param model - 
+ * @param model - 新規実行情報
  */
 export const ApiV1NotebookRunPost = function(parameters = {}) {
   const domain = parameters.$domain ? parameters.$domain : getDomain()
@@ -4486,8 +4486,8 @@ export const ApiV1NotebookByIdHaltPostURL = function(parameters = {}) {
  * url: ApiV1NotebookByIdRerunPostURL
  * method: ApiV1NotebookByIdRerunPost_TYPE
  * raw_url: ApiV1NotebookByIdRerunPost_RAW_URL
- * @param id - 
- * @param model - 
+ * @param id - 再実行対象のノートブックID
+ * @param model - 再実行情報
  */
 export const ApiV1NotebookByIdRerunPost = function(parameters = {}) {
   const domain = parameters.$domain ? parameters.$domain : getDomain()
@@ -7848,7 +7848,7 @@ export const ApiV1TrainingByIdEventsGetURL = function(parameters = {}) {
  * url: ApiV1TrainingRunPostURL
  * method: ApiV1TrainingRunPost_TYPE
  * raw_url: ApiV1TrainingRunPost_RAW_URL
- * @param model - 
+ * @param model - 新規実行情報
  */
 export const ApiV1TrainingRunPost = function(parameters = {}) {
   const domain = parameters.$domain ? parameters.$domain : getDomain()

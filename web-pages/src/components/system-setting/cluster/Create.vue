@@ -23,7 +23,7 @@
         </el-col>
       </el-row>
       <el-form-item label="トークン" prop="token">
-        <el-input v-model="token"/>
+        <el-input type="textarea" v-model="token"/>
       </el-form-item>
       <el-form-item label="メモ">
         <el-input type="textarea" v-model="memo"/>

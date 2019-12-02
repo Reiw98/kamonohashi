@@ -138,14 +138,14 @@
                     <pl-dynamic-multi-input v-model="options"/>
                   </el-form-item>
                   <template v-if="this.clusters && this.clusters.length > 0">
-                    <el-form-item label="オンプレミス">
-                      <el-switch v-model="onPremises"
+                    <el-form-item label="利用リソース">
+                      <el-switch v-model="isCloud"
                                 style="width: 100%;"
-                                inactive-text="クラウド"
-                                active-text="オンプレ"/>
+                                inactive-text="オンプレ"
+                                active-text="クラウド"/>
                     </el-form-item>
                   </template>
-                  <el-form-item label="パーティション" prop="partition" v-if="onPremises">
+                  <el-form-item label="パーティション" prop="partition" v-if="!isCloud">
                     <pl-string-selector
                       v-if="partitions"
                       v-model="partition"
@@ -153,8 +153,8 @@
                     />
                   </el-form-item>
                   <template v-if="this.clusters && this.clusters.length > 0">
-                    <el-form-item label="クラスタ" v-if="!onPremises">
-                      <el-select class="el-input" v-model="clusterId" :clearable="true">
+                    <el-form-item label="クラスタ" v-if="isCloud">
+                      <el-select class="el-input" v-model="clusterId" :clearable="false">
                         <el-option
                           v-for="cluster in clusters"
                           :key="cluster.id"
@@ -243,7 +243,7 @@
         memo: undefined,
         git: undefined,
         options: undefined,
-        onPremises: true,
+        isCloud: false,
         clusters: undefined,
         clusterId: undefined,
         active: 0,
@@ -253,6 +253,9 @@
     async created () {
       this.partitions = (await api.cluster.getPartitions()).data
       this.clusters = (await api.cluster.getClusters()).data
+      if (this.clusters) {
+        this.clusterId = this.clusters[0].id
+      }
       await this.retrieveOriginNotebook()
     },
     methods: {
@@ -275,8 +278,8 @@
                 cpu: this.cpu,
                 memory: this.memory,
                 gpu: this.gpu,
-                Partition: this.onPremises ? this.partition : null,
-                ClusterId: this.onPremises ? null : this.clusterId,
+                Partition: this.isCloud ? null : this.partition,
+                ClusterId: this.isCloud ? this.clusterId : null,
                 memo: this.memo,
                 expiresIn: this.expiresIn * 60 * 60
               }
@@ -362,7 +365,7 @@
           }
           if (this.clusters && this.clusters.length > 0) {
             if (origin.cluster) {
-              this.onPremises = false
+              this.isCloud = true
               this.clusterId = origin.cluster.id
             }
           }

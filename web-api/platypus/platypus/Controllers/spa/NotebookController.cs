@@ -395,7 +395,9 @@ namespace Nssol.Platypus.Controllers.spa
                 //コンテナが正常動作している場合、notebookのエンドポイントを取得
                 if (details.Status.IsRunning())
                 {
-                    url = await GetNotebookEndpointUrlAsync(notebookHistory.Id, details.EndPoints, options.Value.WebEndPoint);
+                    string webEndpoint = notebookHistory.Cluster != null ? notebookHistory.Cluster.HostName : options.Value.WebEndPoint;
+
+                    url = await GetNotebookEndpointUrlAsync(notebookHistory.Id, details.EndPoints, webEndpoint);
                 }
             }
             else

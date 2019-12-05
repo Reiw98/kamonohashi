@@ -127,7 +127,11 @@ namespace Nssol.Platypus.Controllers.spa
                         return JsonNotFound($"Tenant ID {tenantId} is not found.");
                     }
                     // コンテナ管理サービスにテナントを登録する
-                    await clusterManagementLogic.RegistTenantAsync(tenant.Name, cluster);
+                    var clusterResult = await clusterManagementLogic.RegistTenantAsync(tenant.Name, cluster);
+                    if (clusterResult == false)
+                    {
+                        return JsonError(HttpStatusCode.ServiceUnavailable, "Couldn't create cluster master namespace. Please check the configuration to the connect cluster manager service.");
+                    }
                 }
                 clusterRepository.AssignTenants(cluster, model.AssignedTenantIds, true);
             }
@@ -163,12 +167,20 @@ namespace Nssol.Platypus.Controllers.spa
             }
 
             // アクセス可能なテナント一覧を取得する
-            var tenants = clusterRepository.GetAssignedTenants(cluster.Id);
-            foreach (Tenant tenant in tenants)
+            var oldTenants = clusterRepository.GetAssignedTenants(cluster.Id);
+            foreach (Tenant tenant in oldTenants)
             {
                 // コンテナ管理サービスのテナント情報を削除する
                 await clusterManagementLogic.EraseTenantAsync(tenant.Name, cluster);
             }
+
+            // コンテナ管理サービスへのテナント登録に失敗した際のために前のクラスタ情報を保持しておく
+            var oldCluster = new Cluster()
+            {
+                HostName = cluster.HostName,
+                PortNo = cluster.PortNo,
+                ResourceManageKey = cluster.ResourceManageKey
+            };
 
             // ClusterはCLIではなく画面から変更されるので、常にすべての値を入れ替える
             cluster.DisplayName = model.DisplayName;
@@ -191,7 +203,17 @@ namespace Nssol.Platypus.Controllers.spa
                         return JsonNotFound($"Tenant ID {tenantId} is not found.");
                     }
                     // コンテナ管理サービスにテナントを登録する
-                    await clusterManagementLogic.RegistTenantAsync(tenant.Name, cluster);
+                    var clusterResult = await clusterManagementLogic.RegistTenantAsync(tenant.Name, cluster);
+                    if (clusterResult == false)
+                    {
+                        // テナント情報の登録を元に戻す
+                        foreach (Tenant oldTenant in oldTenants)
+                        {
+                            // コンテナ管理サービスにテナントを登録する（ここでの登録は前のクラスタ情報を使用するので失敗しないはず）
+                            await clusterManagementLogic.RegistTenantAsync(oldTenant.Name, oldCluster);
+                        }
+                        return JsonError(HttpStatusCode.ServiceUnavailable, "Couldn't create cluster master namespace. Please check the configuration to the connect cluster manager service.");
+                    }
                 }
                 clusterRepository.AssignTenants(cluster, model.AssignedTenantIds, false);
             }

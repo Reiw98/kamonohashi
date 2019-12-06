@@ -381,7 +381,7 @@ namespace Nssol.Platypus.Controllers.spa
 
             //コンテナ管理サービス作業
             //テナントを登録
-            var tenantResult = await clusterManagementLogic.RegistTenantAsync(tenant.Name, null); // TODO:クラスタ情報をどうするか？
+            var tenantResult = await clusterManagementLogic.RegistTenantAsync(tenant.Name, null);
             if (tenantResult == false)
             {
                 return JsonError(HttpStatusCode.ServiceUnavailable, "Couldn't create cluster master namespace. Please check the configuration to the connect cluster manager service.");

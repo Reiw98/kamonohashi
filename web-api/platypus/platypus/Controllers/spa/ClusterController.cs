@@ -246,6 +246,33 @@ namespace Nssol.Platypus.Controllers.spa
 
             // アクセス可能なテナント一覧を取得する
             var tenants = clusterRepository.GetAssignedTenants(cluster.Id);
+
+            string containerExistMessage = "";
+            // コンテナ存在チェック
+            foreach (Tenant tenant in tenants)
+            {
+                // 削除対象のクラスタ上で、コンテナ稼働中の場合は削除しない
+                var containers = await clusterManagementLogic.GetAllContainerDetailsInfosAsync(tenant.Name, cluster);
+                if (!containers.IsSuccess)
+                {
+                    JsonError(HttpStatusCode.ServiceUnavailable, $"ClusterManagementLogic#GetAllContainerDetailsInfosAsync() retusns error. tenantName=[{tenant.Name}]");
+                }
+                else if (containers.Value.Count() > 0)
+                {
+                    // ステータスによらず、全て稼働中と見做し、エラーメッセージ作成
+                    if (!string.IsNullOrEmpty(containerExistMessage))
+                    {
+                        containerExistMessage += ", ";
+                    }
+                    containerExistMessage += $"tenant name=[{tenant.Name}], running container count=[{containers.Value.Count()}]";
+                }
+            }
+            // コンテナ存在チェックの結果を確認
+            if (!string.IsNullOrEmpty(containerExistMessage))
+            {
+                return JsonConflict($"Running containers exists deleting tenant. {containerExistMessage}");
+            }
+
             foreach (Tenant tenant in tenants)
             {
                 // コンテナ管理サービスのテナント情報を削除する

@@ -1214,7 +1214,7 @@ namespace Nssol.Platypus.Logic
                 // クラスタ管理サービス接続URLを設定
                 inputModel.ClusterManagerServiceBaseUrl = cluster.ServiceBaseUrl;
                 // クラスタ管理サービス接続トークンを取得・設定
-                string token = await GetUserAccessTokenAsync(null);
+                string token = await GetUserAccessTokenAsync(cluster);
                 if (token == null)
                 {
                     //トークンがない場合、結果はnull

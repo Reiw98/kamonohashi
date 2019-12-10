@@ -24,18 +24,27 @@ namespace Nssol.Platypus.Controllers.spa
     {
         private readonly IClusterRepository clusterRepository;
         private readonly ITensorBoardContainerRepository tensorBoardContainerRepository;
+        private readonly ITrainingHistoryRepository trainingHistoryRepository;
+        private readonly IInferenceHistoryRepository inferenceHistoryRepository;
+        private readonly INotebookHistoryRepository notebookHistoryRepository;
         private readonly IClusterManagementLogic clusterManagementLogic;
         private readonly IUnitOfWork unitOfWork;
 
         public ClusterController(
             IClusterRepository clusterRepository,
             ITensorBoardContainerRepository tensorBoardContainerRepository,
+            ITrainingHistoryRepository trainingHistoryRepository,
+            IInferenceHistoryRepository inferenceHistoryRepository,
+            INotebookHistoryRepository notebookHistoryRepository,
             IClusterManagementLogic clusterManagementLogic,
             IUnitOfWork unitOfWork,
             IHttpContextAccessor accessor) : base(accessor)
         {
             this.clusterRepository = clusterRepository;
             this.tensorBoardContainerRepository = tensorBoardContainerRepository;
+            this.trainingHistoryRepository = trainingHistoryRepository;
+            this.inferenceHistoryRepository = inferenceHistoryRepository;
+            this.notebookHistoryRepository = notebookHistoryRepository;
             this.clusterManagementLogic = clusterManagementLogic;
             this.unitOfWork = unitOfWork;
         }
@@ -242,6 +251,23 @@ namespace Nssol.Platypus.Controllers.spa
             if (cluster == null)
             {
                 return JsonNotFound($"Node ID {id.Value} is not found.");
+            }
+
+            //このクラスタを使った履歴がある場合、削除はできない
+            var trainingHistory = trainingHistoryRepository.Find(t => t.ClusterId == cluster.Id);
+            if (trainingHistory != null)
+            {
+                return JsonConflict($"Cluster {cluster.Id}:{cluster.DisplayName} is used at training {trainingHistory.Id} in Tenant {trainingHistory.TenantId}.");
+            }
+            var inferenceHistory = inferenceHistoryRepository.Find(t => t.ClusterId == cluster.Id);
+            if (inferenceHistory != null)
+            {
+                return JsonConflict($"Cluster {cluster.Id}:{cluster.DisplayName} is used at inference {inferenceHistory.Id} in Tenant {inferenceHistory.TenantId}.");
+            }
+            var notebookHistory = notebookHistoryRepository.Find(t => t.ClusterId == cluster.Id);
+            if (notebookHistory != null)
+            {
+                return JsonConflict($"Cluster {cluster.Id}:{cluster.DisplayName} is used at notebook {notebookHistory.Id} in Tenant {notebookHistory.TenantId}.");
             }
 
             // アクセス可能なテナント一覧を取得する

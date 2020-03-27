@@ -6,6 +6,7 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
+using Microsoft.OpenApi.Models;
 using Nssol.Platypus.ApiModels;
 using Nssol.Platypus.Controllers.Util;
 using Nssol.Platypus.DataAccess;
@@ -23,7 +24,6 @@ using Nssol.Platypus.Logic.Interfaces;
 using Nssol.Platypus.Services;
 using Nssol.Platypus.Services.Interfaces;
 using Nssol.Platypus.Swagger;
-using Swashbuckle.AspNetCore.Swagger;
 using System;
 using System.Threading.Tasks;
 
@@ -46,7 +46,7 @@ namespace Nssol.Platypus
         public static string DefaultConnectionString { get; set; }
 
         /// <summary>
-        /// <see cref="Configure(IApplicationBuilder, IHostingEnvironment, ILoggerFactory, IOptions{WebSecurityOptions}, ICommonDiLogic)"/> 内処理用のロガー
+        /// <see cref="Configure(IApplicationBuilder, IWebHostEnvironment, ILoggerFactory, IOptions{WebSecurityOptions}, ICommonDiLogic)"/> 内処理用のロガー
         /// </summary>
         private ILogger logger;
 
@@ -259,11 +259,13 @@ namespace Nssol.Platypus
             #endregion
 
             services.AddCors();
-            services.AddMvc(cfg =>
+            services.AddControllersWithViews(cfg =>
             {
                 // 集約エラー用フィルター
                 cfg.Filters.Add(typeof(GlobalExceptionHandlerAttribute));
             });
+            services.AddRazorPages()
+                .AddNewtonsoftJson(); // Newtonsoft.Jsonを使用
 
             if (wsops.EnableSwagger)
             {
@@ -274,17 +276,17 @@ namespace Nssol.Platypus
                 services.AddSwaggerGen(options =>
                 {
                     // APIの署名を記載
-                    options.SwaggerDoc("v1", new Info
+                    options.SwaggerDoc("v1", new OpenApiInfo
                     {
                         Title = "KAMONOHASHI API",
                         Version = "v1",
                         Description = "For developers only.",
-                        Contact = new Contact()
+                        Contact = new OpenApiContact()
                         {
                             Email = "kamonohashi-support@jp.nssol.nipponsteel.com",
                             Name = "KAMONOHASHI Support"
                         },
-                        TermsOfService = ApplicationConst.Copyright
+                        // TermsOfService = new Uri("http://example.com/terms/") // サービス利用規約
                     });
                     // デフォルトだと同じクラス名の入出力モデルを使えないので、識別に名前空間名も含める
                     // https://stackoverflow.com/questions/46071513/swagger-error-conflicting-schemaids-duplicate-schemaids-detected-for-types-a-a
@@ -293,11 +295,11 @@ namespace Nssol.Platypus
                     // XML Document Comment を読込む
                     options.IncludeXmlComments(xmlPath);
                     //トークン認証用のUIを追加する
-                    options.AddSecurityDefinition("api_key", new ApiKeyScheme()
+                    options.AddSecurityDefinition("api_key", new OpenApiSecurityScheme()
                     {
                         Name = "Authorization",
-                        In = "header",
-                        Type = "apiKey", //この指定が必須。https://github.com/domaindrivendev/Swashbuckle.AspNetCore/issues/124
+                        In = ParameterLocation.Header,
+                        Type = SecuritySchemeType.ApiKey,
                         Description = "JWT Authorization header using the Bearer scheme. Example: \"Bearer {token}\""
                     });
 
@@ -328,15 +330,10 @@ namespace Nssol.Platypus
         /// <param name="loggerFactory">ロガーファクトリ</param>
         /// <param name="securityOptions">appsettings.jsonから読み込んだセキュリティ設定情報</param>
         /// <param name="commonDiLogic">DI用</param>
-        public void Configure(IApplicationBuilder app, IHostingEnvironment env, ILoggerFactory loggerFactory, IOptions<WebSecurityOptions> securityOptions, ICommonDiLogic commonDiLogic)
+        public void Configure(IApplicationBuilder app, IWebHostEnvironment env, ILoggerFactory loggerFactory, IOptions<WebSecurityOptions> securityOptions, ICommonDiLogic commonDiLogic)
         {
             WebSecurityOptions options = securityOptions.Value;
             isDebug = options.EnableRequestPiplineDebugLog;
-
-            //ログ設定（ここで一回やれば、各クラスでの設定は不要）
-            loggerFactory.AddConsole(Configuration.GetSection("Logging"));
-            loggerFactory.AddDebug();
-            loggerFactory.AddProvider(new Log4NetProvider());
 
             logger = loggerFactory.CreateLogger<Startup>();
             LogUtil.WriteSystemLog(logger.LogDebug, "Start to configure Platypus WebUI application");
@@ -401,22 +398,25 @@ namespace Nssol.Platypus
 
                 AddMiddlewareForLogging(app, "Move to authentication", "Back from authentication");
 
+                app.UseRouting();
+
+                app.UseCors(builder => builder
+                    .AllowAnyOrigin()
+                    .AllowAnyMethod()
+                    .AllowAnyHeader());
+
                 app.UseAuthentication();
+                app.UseAuthorization();
 
                 //ASP.NET Core MVCからのレスポンスは常にデバッグログを残す
                 AddMiddlewareForLogging(app, "Execute Request in ASP.NET Core MVC", null);
                 AddMiddlewareForLogging(app, null, "Return Response from ASP.NET Core MVC", true);
 
-                app.UseCors(builder => builder
-                    .AllowAnyOrigin()
-                    .AllowAnyMethod()
-                    .AllowAnyHeader()
-                    .AllowCredentials());
-                app.UseMvc(routes =>
+                app.UseEndpoints(endpoints =>
                 {
-                    routes.MapRoute(
+                    endpoints.MapControllerRoute(
                         name: "default",
-                        template: "{controller=Account}/{action=Index}/{id?}");
+                        pattern: "{controller=Account}/{action=Index}/{id?}");
                 });
 
                 // /wsにアクセスされた際、kubernetes podのshell実行用のwebsocket通信を確立する
